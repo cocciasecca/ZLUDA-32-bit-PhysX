@@ -209,6 +209,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:RUNNER_TEMP/physx-diagnostics-tests.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test texture request classification
+        shell: pwsh
+        run: |
+          rustc --edition=2021 --test zluda64_server/src/texture_diagnostics.rs -o "$env:RUNNER_TEMP/texture-diagnostics-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP/texture-diagnostics-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build control and diagnostic servers
         shell: pwsh
         run: |

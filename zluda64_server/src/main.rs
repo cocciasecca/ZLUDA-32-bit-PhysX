@@ -3,6 +3,8 @@
 
 #[cfg(feature = "physx-diagnostics")]
 mod diagnostics;
+#[cfg(feature = "physx-diagnostics")]
+mod texture_diagnostics;
 
 use cuda_macros::cuda_function_declarations;
 use cuda_types::cuda::*;
@@ -25,6 +27,8 @@ use windows::Win32::System::Threading::*;
 use zluda_server_common::*;
 
 struct State {
+    #[cfg(feature = "physx-diagnostics")]
+    texture_history: texture_diagnostics::TextureHistory,
     ctx: CUcontext,
     device: i32,
     handles: HandlePool,
@@ -270,6 +274,8 @@ impl State {
         unsafe { cuDevicePrimaryCtxRetain(&mut ctx, device) }?;
         unsafe { cuCtxSetCurrent(ctx) }?;
         Ok(Self {
+            #[cfg(feature = "physx-diagnostics")]
+            texture_history: texture_diagnostics::TextureHistory::default(),
             ctx,
             device,
             handles: HandlePool::new(),
@@ -445,10 +451,22 @@ fn main() -> std::io::Result<()> {
                 );
             }
             Some(Opcode::cuTexRefSetAddress_v2) => {
-                handle_cuda_function::<cuTexRefSetAddress_v2In, cuTexRefSetAddress_v2Out>(
+                #[cfg(feature = "physx-diagnostics")]
+                let name = {
+                    let input: ArchivedcuTexRefSetAddress_v2In = local.shared_memory.read_body();
+                    state.texture_history.classify(
+                        input.hTexRef.to_native(),
+                        input.dptr.to_native(),
+                        input.bytes.to_native(),
+                    )
+                };
+                #[cfg(not(feature = "physx-diagnostics"))]
+                let name = std::any::type_name::<cuTexRefSetAddress_v2In>();
+                handle_cuda_function_named::<cuTexRefSetAddress_v2In, cuTexRefSetAddress_v2Out>(
                     &mut local,
                     &mut remote,
                     |input| cu_tex_ref_set_address_v2(&mut state, input),
+                    name,
                 );
             }
             Some(Opcode::cuTexRefSetFlags) => {
@@ -619,6 +637,8 @@ fn cu_module_unload(
     state: &mut State,
     input: &ArchivedcuModuleUnloadIn,
 ) -> Result<cuModuleUnloadOut, CUerror> {
+    #[cfg(feature = "physx-diagnostics")]
+    state.texture_history.clear();
     let hmod = CUmodule(state.handles.remove(input.hmod.to_native())?);
     if let Some(module) = state.modules.modules.remove(&hmod) {
         for global in module.globals.iter() {
@@ -828,6 +848,8 @@ fn cu_mem_free_v2(
     state: &mut State,
     input: &ArchivedcuMemFree_v2In,
 ) -> Result<cuMemFree_v2Out, CUerror> {
+    #[cfg(feature = "physx-diagnostics")]
+    state.texture_history.clear();
     let dptr = input.dptr.to_native();
     state.devmemory.free(dptr)?;
     Ok(cuMemFree_v2Out {})
@@ -872,6 +894,12 @@ fn cu_tex_ref_set_address_v2(
             input.bytes.to_native() as usize,
         )
     }?;
+    #[cfg(feature = "physx-diagnostics")]
+    state.texture_history.succeeded(
+        input.hTexRef.to_native(),
+        input.dptr.to_native(),
+        input.bytes.to_native(),
+    );
     Ok(cuTexRefSetAddress_v2Out {
         ByteOffset: (byte_offset as u32).into(),
     })
@@ -1186,8 +1214,17 @@ fn handle_cuda_function<In: rkyv::Archive + Portable, Out: Portable>(
     remote: &mut Endpoint,
     handler: impl FnOnce(&In::Archived) -> Result<Out, CUerror>,
 ) {
+    handle_cuda_function_named::<In, Out>(local, remote, handler, std::any::type_name::<In>());
+}
+
+fn handle_cuda_function_named<In: rkyv::Archive + Portable, Out: Portable>(
+    local: &mut Endpoint,
+    remote: &mut Endpoint,
+    handler: impl FnOnce(&In::Archived) -> Result<Out, CUerror>,
+    _diagnostic_name: &'static str,
+) {
     #[cfg(feature = "physx-diagnostics")]
-    let diagnostic = diagnostics::Timer::start(std::any::type_name::<In>());
+    let diagnostic = diagnostics::Timer::start(_diagnostic_name);
     let input = local.shared_memory.read_body();
     match handler(&input) {
         Ok(output) => {
