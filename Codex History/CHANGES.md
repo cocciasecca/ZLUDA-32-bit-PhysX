@@ -19,3 +19,9 @@ Use the exact Proton-ZLUDA release's convert.sh only in a disposable staging are
 Set ZLUDA_PHYSX_DIAGNOSTICS to a unique Wine-visible CSV file outside game/prefix paths for each approved run. Verify output and instrumented/uninstrumented overhead first. Preserve original LD_LIBRARY_PATH semantics but ensure experimental runs resolve the intended copied library set.
 
 Rollback: switch back to original ZludaProton and exact original launch options after approval; preserve original tool, COMGR and prefix. Switching tools can modify prefix DLLs: back up affected files/configuration before any test and verify restoration hashes. Do not delete/reset prefix. No rollback currently needed on device: nothing changed.
+
+## Existing GitHub workflow adaptation
+
+.github/workflows/push_master.yml now routes experiment/physx-diagnostics to Build PhysX diagnostic server (Windows), using windows-2022, stable Rust, --locked, x86_64-pc-windows-msvc and release profile. Builds separate control and diagnostic binaries and tests the portable collector. Uses contents:read; does not publish a release on this branch. Existing jobs retain behavior on other refs. Output artifact: physx-servers-<full SHA>, containing control/, diagnostic/, README.txt and SHA256SUMS.txt. This is not a complete Proton package.
+
+UI: Actions -> ZLUDA (push_master.yml) -> Run workflow -> branch experiment/physx-diagnostics -> Run workflow. Existing workflow is already on default branch, so manual dispatch can select our branch. Do not choose master for the diagnostic run. Windows build result remains unverified until execution.

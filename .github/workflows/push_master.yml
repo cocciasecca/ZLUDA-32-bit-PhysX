@@ -15,6 +15,7 @@ env:
 
 jobs:
   build_linux:
+    if: github.ref != 'refs/heads/experiment/physx-diagnostics'
     name: Build (Linux)
     runs-on: ubuntu-22.04
     permissions:
@@ -63,6 +64,7 @@ jobs:
         name: "Version ${{ steps.prepare_artifacts.outputs.VERSION }}"
         tag: "v${{ steps.prepare_artifacts.outputs.VERSION }}"
   build_windows:
+    if: github.ref != 'refs/heads/experiment/physx-diagnostics'
     name: Build (Windows)
     runs-on: windows-2022
     permissions:
@@ -112,6 +114,7 @@ jobs:
         name: "Version ${{ steps.prepare_artifacts.outputs.VERSION }}"
         tag: "v${{ steps.prepare_artifacts.outputs.VERSION }}"
   build_tests:
+    if: github.ref != 'refs/heads/experiment/physx-diagnostics'
     name: Build AMD GPU unit tests
     runs-on: gpu_small
     outputs:
@@ -159,6 +162,7 @@ jobs:
         path: target/amdgpu
         retention-days: 7
   run_tests:
+    if: github.ref != 'refs/heads/experiment/physx-diagnostics'
     name: Run AMD GPU unit tests
     runs-on: gpu_small
     needs: [build_tests]
@@ -181,3 +185,65 @@ jobs:
             ./"$exe" _amdgpu || { error_occurred=1; true; }
         done
         exit $error_occurred
+
+  physx_diagnostics:
+    name: Build PhysX diagnostic server (Windows)
+    if: github.ref == 'refs/heads/experiment/physx-diagnostics'
+    runs-on: windows-2022
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      # This small server build does not need the full LLVM compiler toolchain.
+      RUSTC_WRAPPER: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-pc-windows-msvc
+      - name: Test portable diagnostic aggregation
+        shell: pwsh
+        run: |
+          rustc --edition=2021 --test zluda64_server/src/diagnostics.rs -o "$env:RUNNER_TEMP/physx-diagnostics-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP/physx-diagnostics-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build control and diagnostic servers
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/control, artifacts/diagnostic | Out-Null
+          cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe artifacts/control/
+          cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-diagnostics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe artifacts/diagnostic/
+      - name: Record provenance and usage
+        shell: pwsh
+        run: |
+          @(
+            "Commit: $env:GITHUB_SHA"
+            "Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+            "Target: x86_64-pc-windows-msvc; profile: release; Cargo.lock: --locked"
+            "Control: features omitted; diagnostic: physx-diagnostics enabled"
+            (rustc --version)
+            (cargo --version)
+            ""
+            "Experimental server binaries only, not a complete Proton tool."
+            "Use with the matching ZLUDA v7-preview.15 payload in a SEPARATE experimental Proton-ZLUDA tool."
+            "Preserve the original tool, prefix, saves and working COMGR library."
+            "For the diagnostic server set ZLUDA_PHYSX_DIAGNOSTICS to a NEW Wine-visible CSV path."
+            "Without that variable collection is disabled. Existing output files are never overwritten."
+            "Windows build/unit tests do not establish GPU or game correctness."
+          ) | Set-Content artifacts/README.txt
+          Get-ChildItem artifacts -Recurse -Filter *.exe | ForEach-Object {
+            $relative = $_.FullName.Substring((Resolve-Path artifacts).Path.Length + 1)
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $relative
+          } | Set-Content artifacts/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: physx-servers-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14

@@ -27,3 +27,7 @@ SHA256 under ZludaProton:
 - zluda-libs/libamd_comgr.so.3: e765f0913bc94de361b8e471e22c5085b2e6d967510cb80c2084b031e3f4781c
 
 These are installed-file fingerprints, not a comparison against release archive hashes. Loaded runtime paths remain to inspect during an approved game session. Build and benchmark blockers remain; network/authentication blocker resolved.
+
+## 2026-10-18 — manual GitHub Windows build prepared
+
+User explicitly authorized pushing the experimental branch. Adapted existing .github/workflows/push_master.yml: manual dispatch on experiment/physx-diagnostics selects a Windows-only server job; existing full builds, GPU tests and release publication are skipped on that branch. Generates control and feature-enabled diagnostic servers, runs portable tests, and uploads README/provenance/SHA256 artifact for 14 days. No new workflow or default-branch change required. Branch push does not trigger this workflow (push trigger remains master only); user will dispatch it through Actions. actionlint 1.7.12 passed with existing custom gpu_small runner label configured locally; shellcheck/pyflakes disabled. git diff --check passed. Actual Windows build and GPU validation still pending.
