@@ -1,0 +1,289 @@
+{
+  "pid": 5156,
+  "csv_path": "/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/diagnostics/requests-57dfc0d981304de4950198aaacc1e153.csv.pid-592.csv",
+  "start_unix_ns": 1792354632352292915,
+  "end_unix_ns": 1792354662382046181,
+  "cutoff_window_ns": 278854253400,
+  "clock_ticks": 100,
+  "samples": [
+    {
+      "time": 1212.390963604,
+      "ticks": 6803,
+      "rss": "\t  231420 kB",
+      "switches": 579417,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1213.391994327,
+      "ticks": 6884,
+      "rss": "\t  231416 kB",
+      "switches": 586524,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1214.393057597,
+      "ticks": 6967,
+      "rss": "\t  231416 kB",
+      "switches": 593808,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1215.39376649,
+      "ticks": 7048,
+      "rss": "\t  231424 kB",
+      "switches": 600947,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1216.394663056,
+      "ticks": 7131,
+      "rss": "\t  231320 kB",
+      "switches": 608235,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1217.395573874,
+      "ticks": 7212,
+      "rss": "\t  231352 kB",
+      "switches": 615416,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1218.39672153,
+      "ticks": 7295,
+      "rss": "\t  231332 kB",
+      "switches": 622785,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1219.397958561,
+      "ticks": 7378,
+      "rss": "\t  231364 kB",
+      "switches": 630160,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1220.399208701,
+      "ticks": 7460,
+      "rss": "\t  231408 kB",
+      "switches": 637366,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1221.399905843,
+      "ticks": 7543,
+      "rss": "\t  231348 kB",
+      "switches": 644879,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1222.401048904,
+      "ticks": 7626,
+      "rss": "\t  231484 kB",
+      "switches": 652413,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1223.401946648,
+      "ticks": 7708,
+      "rss": "\t  231336 kB",
+      "switches": 659234,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1224.403055501,
+      "ticks": 7790,
+      "rss": "\t  231332 kB",
+      "switches": 666512,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1225.40393144,
+      "ticks": 7872,
+      "rss": "\t  231376 kB",
+      "switches": 673870,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1226.404756865,
+      "ticks": 7953,
+      "rss": "\t  231396 kB",
+      "switches": 680902,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1227.405542377,
+      "ticks": 8035,
+      "rss": "\t  231392 kB",
+      "switches": 688078,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1228.406282224,
+      "ticks": 8116,
+      "rss": "\t  231376 kB",
+      "switches": 694785,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1229.407305218,
+      "ticks": 8196,
+      "rss": "\t  231416 kB",
+      "switches": 701574,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1230.408237602,
+      "ticks": 8276,
+      "rss": "\t  231320 kB",
+      "switches": 708178,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1231.409323363,
+      "ticks": 8357,
+      "rss": "\t  231344 kB",
+      "switches": 714937,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1232.410189366,
+      "ticks": 8438,
+      "rss": "\t  231320 kB",
+      "switches": 721761,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1233.410946313,
+      "ticks": 8518,
+      "rss": "\t  231344 kB",
+      "switches": 728415,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1234.411874381,
+      "ticks": 8598,
+      "rss": "\t  231452 kB",
+      "switches": 735076,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1235.412896402,
+      "ticks": 8677,
+      "rss": "\t  231320 kB",
+      "switches": 741921,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1236.41412821,
+      "ticks": 8758,
+      "rss": "\t  231328 kB",
+      "switches": 748824,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1237.415160217,
+      "ticks": 8838,
+      "rss": "\t  231320 kB",
+      "switches": 755375,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1238.416501983,
+      "ticks": 8918,
+      "rss": "\t  231384 kB",
+      "switches": 762301,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1239.417492566,
+      "ticks": 8999,
+      "rss": "\t  231416 kB",
+      "switches": 769204,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70
+      }
+    },
+    {
+      "time": 1240.418265195,
+      "ticks": 9079,
+      "rss": "\t  231364 kB",
+      "switches": 776117,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1241.419155141,
+      "ticks": 9158,
+      "rss": "\t  231344 kB",
+      "switches": 782858,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    },
+    {
+      "time": 1242.420198665,
+      "ticks": 9239,
+      "rss": "\t  231320 kB",
+      "switches": 789800,
+      "gpu_busy": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69
+      }
+    }
+  ]
+}

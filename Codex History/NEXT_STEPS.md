@@ -45,3 +45,19 @@ Read-only live sample (PID 4308, 10.000927 s): server CPU 78.4927% of one core f
 ## Corrected diagnostics installed after user closed game
 
 User explicitly authorized update after closing Batman; no game/server processes found. Run 39161675790 succeeded. Downloaded payload verified SHA256, PE architectures and embedded e8541ca7621562abd09d5f54ef83526701baf6dc revision. Updated experimental server, matching proxy, experimental default_pfx proxy and control payload only. Previous files saved under ZludaProton-Experiment/update-backup-39161675790; update-manifest-39161675790.json records new hashes. Original tool checked against complete original manifest; COMGR unchanged. Existing prefix nvcuda hashes unchanged during update. Proton source confirms nvcuda copy is in per-launch tracked-files block, outside prefix-info-change condition; verify actual proxy delivery on next launch. No game launch or Steam settings change by agent. Existing CSV retained; new outputs append .pid-N.csv. Initial automatic approval review timed out before execution; allowed retry succeeded. Runtime CSV behavior still pending next user launch.
+
+## First successful in-scene request profile — police tape
+
+User confirms identical position/scene/settings, reports approximately 25 FPS (user observation, not captured frame-time mean). Server Linux PID 5156; active CSV Windows PID 592, revision e8541ca. Launcher PID 416 CSV remains header-only; game CSV now grows, confirming per-process filename fix. Capture: 30.029 s of read-only /proc/sysfs samples; five COMPLETE 5 s CSV windows strictly after the capture's initial last-completed-window boundary, totaling 25.0018556 s. Excluded partly elapsed first window. Files: measurements/police-tape-2026-10-18/{selected-windows.csv,summary.json,samples.json}. Full raw CSV/maps retained locally at /private/tmp/zluda-scene-capture/police-tape-30s.json.
+
+- cuTexRefSetAddress_v2: 64,151 calls; 2,565.85/s; 18.4036043 s service time; 286.88 us mean; 1.7586 ms maximum; **94.42% of total measured request service time**.
+- cuMemcpyDtoHAsync_v2 (includes internal stream synchronization): 0.6888136 s, 3.53%.
+- cuMemcpyHtoDAsync_v2: 0.1838876 s, 0.94%.
+- cuLaunchKernel: 18,083 calls; 0.1360875 s host service time, NOT GPU kernel duration.
+- All recorded request statuses zero in selected windows. No cuMemAlloc/cuMemFree requests in those windows.
+- Total measured service time 19.4912619 s over 25.0018556 s; excludes IPC wait and diagnostic writes, includes decoding/serialization and nested calls.
+- Over 30.029 s sample: server CPU 81.12% of one core; main-thread context switches 7,005.94/s (not all-thread aggregate); RSS 231,420 -> 231,320 kB. GPU busy arithmetic mean of 31 approximately 1 Hz aggregate samples 69.55% (not dedicated compute utilization).
+
+Source trace: zluda64_server cu_tex_ref_set_address_v2 -> cuTexRefSetAddress_v2 -> zluda/src/impl/tex.rs::ref_set_address_v2 -> hipUnbindTexture for null pointer, hipTexRefSetAddress otherwise. Current counter groups bind AND unbind; cannot distinguish their rates or time. Flags/format setters already refresh only when changed. Need separate null/non-null, binding identity and bytes/redundancy counters or HIP tracing before optimization. At roughly 3 address calls per format/flags call, a bind/unbind pattern is plausible but NOT established.
+
+This supersedes pageable transfer overhead as the first investigation target for this scene. Similarity between 2,566 address calls/s and historic approximately 2,417 KFD unmaps/s is a lead, not a causal match: captures are not simultaneous. No KFD measurement or userspace unmap stacks taken in this run. No frame-time improvement demonstrated. Next: attribute bind/unbind costs and KFD stacks; consider caching only with texture state, null-unbind semantics, kernel ordering and resource lifetime preserved. Do not skip synchronization or blindly cache texture addresses.
