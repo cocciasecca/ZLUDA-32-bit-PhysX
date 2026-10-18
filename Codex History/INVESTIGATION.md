@@ -20,3 +20,7 @@ Next attribution capture: inspect loaded HIP/HSA library paths and build IDs fro
 ## Unknown / blocked
 
 SSH name resolution fails; no current target observation. Installed binary SHA/version and actual runtime libraries unknown. No runtime causal attribution, supported optimization, graphics validation or frame-time improvement. Phase A lacks HIP event/lifetime/byte counters and client round-trip measurements; extend after obtaining target traces and validating this prototype.
+
+## Target verification update
+
+SSH access now works at 192.168.10.67. Installed server embeds the exact fork commit 86ec0a93cc83ba5b52e645892523e339dfa884f7. Installed-file hashes recorded in PROGRESS.md; release archive equality not yet checked. COMGR dependencies resolve. No game/server found by process-name check, so runtime-loaded library provenance and causal attribution remain pending.
