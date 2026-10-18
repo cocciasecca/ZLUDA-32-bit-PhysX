@@ -1,6 +1,9 @@
 // Prevent the console window from appearing when running the server on Windows
 #![windows_subsystem = "windows"]
 
+#[cfg(feature = "physx-diagnostics")]
+mod diagnostics;
+
 use cuda_macros::cuda_function_declarations;
 use cuda_types::cuda::*;
 use dark_api::FunctionArgInfo;
@@ -1183,6 +1186,8 @@ fn handle_cuda_function<In: rkyv::Archive + Portable, Out: Portable>(
     remote: &mut Endpoint,
     handler: impl FnOnce(&In::Archived) -> Result<Out, CUerror>,
 ) {
+    #[cfg(feature = "physx-diagnostics")]
+    let diagnostic = diagnostics::Timer::start(std::any::type_name::<In>());
     let input = local.shared_memory.read_body();
     match handler(&input) {
         Ok(output) => {
@@ -1191,6 +1196,8 @@ fn handle_cuda_function<In: rkyv::Archive + Portable, Out: Portable>(
         }
         Err(e) => remote.shared_memory.write_header(e.0.get()),
     }
+    #[cfg(feature = "physx-diagnostics")]
+    diagnostic.finish(remote.shared_memory.read_header());
     unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
 }
 
@@ -1223,10 +1230,14 @@ fn handle_cuda_function_framed_out<In: Archive + Portable, Out>(
 ) where
     Out: for<'a, 'b> Serialize<Serializer<'a, 'b>>,
 {
+    #[cfg(feature = "physx-diagnostics")]
+    let diagnostic = diagnostics::Timer::start(std::any::type_name::<In>());
     if let Err(err) = handle_cuda_function_framed_out_impl::<In, Out>(local, remote, arena, handler)
     {
         remote.shared_memory.write_header(err.0.get());
     }
+    #[cfg(feature = "physx-diagnostics")]
+    diagnostic.finish(remote.shared_memory.read_header());
     unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
 }
 
@@ -1256,9 +1267,13 @@ fn handle_cuda_function_framed_in<In: Archive, Out: Portable>(
 ) where
     Out: for<'a, 'b> Serialize<Serializer<'a, 'b>>,
 {
+    #[cfg(feature = "physx-diagnostics")]
+    let diagnostic = diagnostics::Timer::start(std::any::type_name::<In>());
     if let Err(err) = handle_cuda_function_framed_in_impl::<In, Out>(local, remote, handler) {
         remote.shared_memory.write_header(err.0.get());
     }
+    #[cfg(feature = "physx-diagnostics")]
+    diagnostic.finish(remote.shared_memory.read_header());
     unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
 }
 

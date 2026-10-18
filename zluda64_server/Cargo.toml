@@ -30,3 +30,7 @@ vergen-gix = "10.0.2"
 
 [package.metadata.zluda]
 windows_only = true
+
+[features]
+# Aggregated diagnostics; omitted entirely from normal builds.
+physx-diagnostics = []
