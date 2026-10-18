@@ -19,3 +19,7 @@ GitHub diagnostic branch build at a6379f0000c5abffb731261f8de42cfda7d9150d succe
 ## Integration correction: matching proxy required
 
 Before installation, inspected zluda32/src/ipc.rs::read_git_version: it rejects a server whose embedded Git SHA differs. Previous server-only artifact cannot be paired with original installed 32-bit DLL. No incompatible binary installed. Workflow corrected to build/package zluda32 for i686-pc-windows-msvc from the same commit as both servers; checksum manifest includes DLL. Preserve existing handshake, protocol and original 64-bit ZLUDA library. User authorized preparing/installing separate experimental tool; no game launch or Steam setting change authorized by this action.
+
+## Integration payload ready, device unreachable
+
+Run 39160259995 succeeded: portable Windows tests, control/diagnostic x64 servers, matching x86 proxy all built. Downloaded to /private/tmp/zluda-physx-build-39160259995; all three manifest SHA256 hashes, PE machine types and embedded 866951a53be80c5a8d4f605b9ec72db8f6839817 revision verified. DEPLOYMENT.md records safe staging/rollback and existing-prefix DLL loading caveat. SSH 192.168.10.67 timed out twice; requested device connectivity/IP. Installation NOT performed. No target files, Steam settings or game prefix changed. Resume with read-only settings inspection then authorized separate tool installation when reachable.
