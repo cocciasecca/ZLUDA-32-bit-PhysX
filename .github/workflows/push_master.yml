@@ -239,7 +239,7 @@ jobs:
             "Experimental servers and matching 32-bit proxy, not a complete Proton tool."
             "Install 32/nvcuda.dll together with either server: their embedded Git revisions MUST match. Keep the original v7-preview.15 64-bit nvcuda.dll in a SEPARATE experimental tool."
             "Preserve the original tool, prefix, saves and working COMGR library."
-            "For the diagnostic server set ZLUDA_PHYSX_DIAGNOSTICS to a NEW Wine-visible CSV path."
+            "For the diagnostic server set ZLUDA_PHYSX_DIAGNOSTICS to a NEW Wine-visible CSV base path (server adds .pid-N.csv)."
             "Without that variable collection is disabled. Existing output files are never overwritten."
             "Windows build/unit tests do not establish GPU or game correctness."
           ) | Set-Content artifacts/README.txt

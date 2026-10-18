@@ -24,3 +24,11 @@ SSH name resolution fails; no current target observation. Installed binary SHA/v
 ## Target verification update
 
 SSH access now works at 192.168.10.67. Installed server embeds the exact fork commit 86ec0a93cc83ba5b52e645892523e339dfa884f7. Installed-file hashes recorded in PROGRESS.md; release archive equality not yet checked. COMGR dependencies resolve. No game/server found by process-name check, so runtime-loaded library provenance and causal attribution remain pending.
+
+## First live scene: police tape and electrical particles
+
+User reports approximately 28 FPS versus earlier approximately 21 FPS in police-tape scene, with electrical spark/particle effects also visible (present in earlier run but previously unreported). User attributes these to PhysX; exact effect ownership not independently verified. Not a matched A/B or measured FPS trace; no optimization conclusion.
+
+Confirmed running experimental server (Linux PID 4308), matching prefix DLL SHA256 0901df0c0a0c1a3bd995f93b681abc20071b82295fbfa44a8cd83fa6ad949c82, and experimental hipwine/HIP/HSA/COMGR paths in /proc/4308/maps. GPU/KFD handles present; this alone does not validate individual effects.
+
+Diagnostic failure found: CSV only 150-byte headers, tagged Windows PID 416 (0x1a0). Proton log shows TWO server starts, Windows PIDs 0x1a0 and 0x594. Both inherit same per-Proton-invocation CSV path; create_new lets first server create file and prevents second from recording. Active server has no CSV fd. Existing portable tests did not cover launcher+game inheritance. Fix: append server PID to configured CSV base path, retain create_new/no overwrite. Three portable tests now pass including two-process-path collision protection and preservation of existing data. This run provides no CUDA timing breakdown. Need rebuilt matching proxy/server and user-approved restart/update before repeating. No current game interruption or runtime replacement.

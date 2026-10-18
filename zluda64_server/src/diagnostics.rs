@@ -5,6 +5,7 @@ use std::{
     collections::BTreeMap,
     fs::{File, OpenOptions},
     io::{self, Write},
+    path::PathBuf,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -36,9 +37,19 @@ struct Recorder {
     stats: BTreeMap<&'static str, Stats>,
 }
 
+// A launcher and the game can inherit the same environment but create separate servers.
+// Keep create_new protection while giving each server its own output file.
+fn process_output_path(mut base: std::ffi::OsString, pid: u32) -> PathBuf {
+    base.push(format!(".pid-{pid}.csv"));
+    PathBuf::from(base)
+}
+
 impl Recorder {
     fn open() -> Option<Self> {
-        let path = std::env::var_os("ZLUDA_PHYSX_DIAGNOSTICS")?;
+        let path = process_output_path(
+            std::env::var_os("ZLUDA_PHYSX_DIAGNOSTICS")?,
+            std::process::id(),
+        );
         // Never truncate existing data. An invalid path disables diagnostics.
         let mut file = OpenOptions::new().write(true).create_new(true).open(path).ok()?;
         let epoch = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_nanos();
@@ -99,6 +110,22 @@ impl Timer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inherited_output_path_does_not_collide_between_servers() {
+        let base = std::env::temp_dir().join(format!("zluda-multiprocess-{}", std::process::id()));
+        let launcher = process_output_path(base.clone().into_os_string(), 416);
+        let game = process_output_path(base.into_os_string(), 1428);
+        assert_ne!(launcher, game);
+        for path in [&launcher, &game] {
+            let mut file = OpenOptions::new().write(true).create_new(true).open(path).unwrap();
+            file.write_all(b"preserve-existing-data").unwrap();
+        }
+        assert!(OpenOptions::new().write(true).create_new(true).open(&launcher).is_err());
+        assert_eq!(std::fs::read(&launcher).unwrap(), b"preserve-existing-data");
+        std::fs::remove_file(launcher).unwrap();
+        std::fs::remove_file(game).unwrap();
+    }
 
     #[test]
     fn aggregates_success_failure_and_tail_latency() {
