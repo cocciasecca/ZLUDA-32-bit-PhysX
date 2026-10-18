@@ -25,3 +25,11 @@ Rollback: switch back to original ZludaProton and exact original launch options 
 .github/workflows/push_master.yml now routes experiment/physx-diagnostics to Build PhysX diagnostic server (Windows), using windows-2022, stable Rust, --locked, x86_64-pc-windows-msvc and release profile. Builds separate control and diagnostic binaries and tests the portable collector. Uses contents:read; does not publish a release on this branch. Existing jobs retain behavior on other refs. Output artifact: physx-servers-<full SHA>, containing control/, diagnostic/, README.txt and SHA256SUMS.txt. This is not a complete Proton package.
 
 UI: Actions -> ZLUDA (push_master.yml) -> Run workflow -> branch experiment/physx-diagnostics -> Run workflow. Existing workflow is already on default branch, so manual dispatch can select our branch. Do not choose master for the diagnostic run. Windows build result remains unverified until execution.
+
+## Windows CI validation — run 39159028893
+
+GitHub diagnostic branch build at a6379f0000c5abffb731261f8de42cfda7d9150d succeeded. Windows portable tests and both server builds passed; full/GPU jobs skipped as intended. Job duration approximately 3m40s. Downloaded artifact into /private/tmp/zluda-physx-build-39159028893 and verified both executable SHA256 values against bundled manifest. No target installation or game testing. Next: prepare separate experimental tool integration for user approval; no FPS improvement established.
+
+## Integration correction: matching proxy required
+
+Before installation, inspected zluda32/src/ipc.rs::read_git_version: it rejects a server whose embedded Git SHA differs. Previous server-only artifact cannot be paired with original installed 32-bit DLL. No incompatible binary installed. Workflow corrected to build/package zluda32 for i686-pc-windows-msvc from the same commit as both servers; checksum manifest includes DLL. Preserve existing handshake, protocol and original 64-bit ZLUDA library. User authorized preparing/installing separate experimental tool; no game launch or Steam setting change authorized by this action.

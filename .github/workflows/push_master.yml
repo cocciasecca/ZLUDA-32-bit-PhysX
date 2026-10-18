@@ -201,7 +201,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          target: x86_64-pc-windows-msvc
+          target: x86_64-pc-windows-msvc,i686-pc-windows-msvc
       - name: Test portable diagnostic aggregation
         shell: pwsh
         run: |
@@ -212,13 +212,19 @@ jobs:
       - name: Build control and diagnostic servers
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force artifacts/control, artifacts/diagnostic | Out-Null
+          New-Item -ItemType Directory -Force artifacts/control, artifacts/diagnostic, artifacts/32 | Out-Null
           cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe artifacts/control/
           cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-diagnostics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe artifacts/diagnostic/
+      - name: Build matching 32-bit proxy
+        shell: pwsh
+        run: |
+          cargo build --locked --release -p zluda32 --target i686-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item target/i686-pc-windows-msvc/release/nvcuda.dll artifacts/32/
       - name: Record provenance and usage
         shell: pwsh
         run: |
@@ -230,14 +236,14 @@ jobs:
             (rustc --version)
             (cargo --version)
             ""
-            "Experimental server binaries only, not a complete Proton tool."
-            "Use with the matching ZLUDA v7-preview.15 payload in a SEPARATE experimental Proton-ZLUDA tool."
+            "Experimental servers and matching 32-bit proxy, not a complete Proton tool."
+            "Install 32/nvcuda.dll together with either server: their embedded Git revisions MUST match. Keep the original v7-preview.15 64-bit nvcuda.dll in a SEPARATE experimental tool."
             "Preserve the original tool, prefix, saves and working COMGR library."
             "For the diagnostic server set ZLUDA_PHYSX_DIAGNOSTICS to a NEW Wine-visible CSV path."
             "Without that variable collection is disabled. Existing output files are never overwritten."
             "Windows build/unit tests do not establish GPU or game correctness."
           ) | Set-Content artifacts/README.txt
-          Get-ChildItem artifacts -Recurse -Filter *.exe | ForEach-Object {
+          Get-ChildItem artifacts -Recurse -File | Where-Object { $_.Extension -in ".exe", ".dll" } | ForEach-Object {
             $relative = $_.FullName.Substring((Resolve-Path artifacts).Path.Length + 1)
             "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $relative
           } | Set-Content artifacts/SHA256SUMS.txt
