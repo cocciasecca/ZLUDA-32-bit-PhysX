@@ -239,6 +239,13 @@ jobs:
           cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-texture-reuse
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe artifacts/reuse/
+      - name: Test allocation range cache
+        shell: pwsh
+        run: |
+          rustc --edition=2021 --test zluda32/src/range_cache.rs -o "$env:RUNNER_TEMP/range-cache-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP/range-cache-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build matching 32-bit proxy
         shell: pwsh
         run: |
@@ -253,6 +260,7 @@ jobs:
             "Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
             "Target: x86_64-pc-windows-msvc; profile: release; Cargo.lock: --locked"
             "Control: features omitted; diagnostic: physx-diagnostics enabled"
+            "32-bit range metadata cache: opt-in ZLUDA_PHYSX_RANGE_CACHE=1; bounded to 256 entries; texture reuse should remain OFF. Stats use diagnostics base plus .range-cache.pid-N.csv, cumulative every 4096 queries."
             "Reuse: physx-texture-reuse feature; additionally requires ZLUDA_PHYSX_TEXTURE_REUSE=1"
             "Reuse is an UNVALIDATED GPU prototype: preserves explicit barriers and defers native texture unbind within restricted bridge sequences."
             "Reuse retained resources bounded to 64 texture handles; do not enable without controlled correctness and frame-time checks."

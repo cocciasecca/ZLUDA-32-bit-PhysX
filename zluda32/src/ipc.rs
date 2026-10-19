@@ -16,6 +16,11 @@ pub(crate) struct Server {
     remote: zluda_server_common::Endpoint,
     _child: Child,
     arena: stumpalo::Arena,
+    range_cache: crate::range_cache::RangeCache,
+    range_cache_enabled: bool,
+    range_queries: u64,
+    range_hits: u64,
+    range_log: Option<std::fs::File>,
 }
 
 impl Server {
@@ -58,12 +63,110 @@ impl Server {
         zluda_windows::kill_child_on_process_exit(child.as_handle().as_raw_handle())?;
         read_git_version(&local)?;
         let arena = stumpalo::Arena::new();
+        let range_cache_enabled = env::var("ZLUDA_PHYSX_RANGE_CACHE").as_deref() == Ok("1");
+        let range_log = env::var("ZLUDA_PHYSX_DIAGNOSTICS").ok().and_then(|base| {
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(format!("{base}.range-cache.pid-{}.csv", std::process::id()))
+                .ok()?;
+            writeln!(
+                file,
+                "# git={},enabled={}\nqueries,hits,misses",
+                env!("VERGEN_GIT_SHA"),
+                range_cache_enabled
+            )
+            .ok()?;
+            Some(file)
+        });
         Ok(Server {
             local,
             remote,
             _child: child,
             arena,
+            range_cache: Default::default(),
+            range_cache_enabled,
+            range_queries: 0,
+            range_hits: 0,
+            range_log,
         })
+    }
+
+    pub(crate) fn invalidate_ranges(&mut self) {
+        self.range_cache.clear();
+    }
+
+    // Unknown/future operations invalidate by default. Only operations audited
+    // not to change the bridge allocation map can retain cached replies.
+    fn prepare_range_cache(&mut self, opcode: &Opcode) {
+        if !matches!(
+            opcode,
+            Opcode::cuMemGetAddressRange_v2
+                | Opcode::cuTexRefSetAddress_v2
+                | Opcode::cuTexRefSetFlags
+                | Opcode::cuTexRefSetFormat
+                | Opcode::cuMemcpyHtoD_v2
+                | Opcode::cuMemcpyHtoDAsync_v2
+                | Opcode::cuMemcpyDtoHAsync_v2
+                | Opcode::cuMemcpyDtoD_v2
+                | Opcode::cuMemcpyDtoDAsync_v2
+                | Opcode::cuMemsetD8_v2
+                | Opcode::cuLaunchKernel
+                | Opcode::cuCtxSynchronize
+                | Opcode::cuEventRecord
+                | Opcode::cuEventQuery
+                | Opcode::cuEventSynchronize
+                | Opcode::cuStreamQuery
+        ) {
+            self.invalidate_ranges();
+        }
+    }
+
+    pub(crate) fn address_range(&mut self, pointer: u32) -> Result<(u32, u32), CUerror> {
+        self.range_queries += 1;
+        let cached = self
+            .range_cache_enabled
+            .then(|| self.range_cache.get(pointer))
+            .flatten();
+        let result = if let Some(reply) = cached {
+            self.range_hits += 1;
+            Ok(reply)
+        } else {
+            self.remote_call_zero_copy::<zluda_server_common::cuMemGetAddressRange_v2Out>(
+                Opcode::cuMemGetAddressRange_v2,
+                zluda_server_common::cuMemGetAddressRange_v2In {
+                    dptr: pointer.into(),
+                },
+            )
+            .map(|r| (r.pbase.to_native(), r.psize.to_native()))
+        };
+        match result {
+            Ok((base, size)) if self.range_cache_enabled && cached.is_none() => {
+                self.range_cache.insert(pointer, base, size)
+            }
+            Err(_) => self.invalidate_ranges(),
+            _ => (),
+        }
+        // Bounded aggregate output, no per-request disk I/O. Final partial batch
+        // is intentionally not flushed on process termination.
+        if self.range_queries % 4096 == 0 {
+            use std::io::Write;
+            if let Some(file) = self.range_log.as_mut() {
+                if writeln!(
+                    file,
+                    "{},{},{}",
+                    self.range_queries,
+                    self.range_hits,
+                    self.range_queries - self.range_hits
+                )
+                .is_err()
+                {
+                    self.range_log = None;
+                }
+            }
+        }
+        result
     }
 
     pub(crate) fn remote_call_zero_copy<Out: Portable + Clone>(
@@ -71,13 +174,17 @@ impl Server {
         opcode: Opcode,
         data: impl for<'a, 'b> Serialize<Serializer<'a, 'b>>,
     ) -> Result<Out, CUerror> {
+        self.prepare_range_cache(&opcode);
         self.remote.shared_memory.write_header(opcode as u32);
         self.remote.shared_memory.write_body(&data);
         unsafe { SignalObjectAndWait(*self.remote.event, *self.local.event, INFINITE, false) };
         let return_value = self.local.shared_memory.read_header();
         match NonZeroU32::new(return_value) {
             None => Ok(()),
-            Some(code) => Err(CUerror(code)),
+            Some(code) => {
+                self.invalidate_ranges();
+                Err(CUerror(code))
+            }
         }?;
         Ok(self.local.shared_memory.read_body())
     }
@@ -87,6 +194,7 @@ impl Server {
         opcode: Opcode,
         data: impl for<'a, 'b> Serialize<Serializer<'a, 'b>>,
     ) -> Result<Out, CUerror> {
+        self.prepare_range_cache(&opcode);
         let opcode = opcode as u32;
         self.remote.shared_memory.write_header(opcode);
         let old_shmem = self
@@ -102,7 +210,10 @@ impl Server {
         let return_value = self.local.shared_memory.read_header();
         match NonZeroU32::new(return_value) {
             None => Ok(()),
-            Some(code) => Err(CUerror(code)),
+            Some(code) => {
+                self.invalidate_ranges();
+                Err(CUerror(code))
+            }
         }?;
         Ok(self.local.shared_memory.read_body())
     }
@@ -115,6 +226,7 @@ impl Server {
     where
         <Out as Archive>::Archived: Deserialize<Out, Strategy<(), Failure>>,
     {
+        self.prepare_range_cache(&opcode);
         self.remote.shared_memory.write_header(opcode as u32);
         self.remote.shared_memory.write_body(&data);
         unsafe { SignalObjectAndWait(*self.remote.event, *self.local.event, INFINITE, false) };
@@ -131,7 +243,10 @@ impl Server {
         }
         match NonZeroU32::new(return_value) {
             None => Ok(()),
-            Some(code) => Err(CUerror(code)),
+            Some(code) => {
+                self.invalidate_ranges();
+                Err(CUerror(code))
+            }
         }?;
         self.local.shared_memory.deserialize_body()
     }

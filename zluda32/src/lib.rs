@@ -15,6 +15,7 @@ use zluda_common::{CodeLibraryRef, CodeModuleRef};
 use zluda_server_common::*;
 
 mod ipc;
+mod range_cache;
 
 macro_rules! not_implemented {
     ($($abi:literal fn $fn_name:ident( $($arg_id:ident : $arg_type:ty),* ) -> $ret_type:ty;)*) => {
@@ -243,6 +244,7 @@ pub(crate) fn cu_ctx_create_v2(
     let cu_ctx: CUcontext;
     {
         let mut state = GlobalState::get()?.lock().map_err(|_| CUerror::UNKNOWN)?;
+        state.server.invalidate_ranges();
         state.next_context = state.next_context.wrapping_add(1);
         let new_ctx = CUcontext(state.next_context as *mut _);
         state.context_state.insert(new_ctx, FxHashMap::default());
@@ -258,6 +260,7 @@ pub(crate) fn cu_ctx_create_v2(
 pub(crate) fn cu_ctx_detach(ctx: CUcontext) -> Result<(), CUerror> {
     let ctx_storage = {
         let mut state = GlobalState::get()?.lock().map_err(|_| CUerror::UNKNOWN)?;
+        state.server.invalidate_ranges();
         state.context_state.remove(&ctx).ok_or(CUerror::UNKNOWN)?
     };
     for (key, (value, dtor_cb)) in ctx_storage {
@@ -296,6 +299,11 @@ pub(crate) fn cu_ctx_set_current(ctx: CUcontext) -> Result<(), CUerror> {
     if ctx.0.is_null() {
         return Err(CUerror::NOT_SUPPORTED);
     }
+    GlobalState::get()?
+        .lock()
+        .map_err(|_| CUerror::UNKNOWN)?
+        .server
+        .invalidate_ranges();
     CONTEXT_STACK.with(|s| s.push(ctx, 0));
     Ok(())
 }
@@ -588,14 +596,12 @@ pub(crate) fn cu_mem_get_address_range_v2(
 ) -> Result<(), CUerror> {
     let pbase = unsafe { pbase.as_mut() }.ok_or(CUerror::INVALID_VALUE)?;
     let psize = unsafe { psize.as_mut() }.ok_or(CUerror::INVALID_VALUE)?;
-    let result = GlobalState::remote_call_zero_copy::<cuMemGetAddressRange_v2Out>(
-        Opcode::cuMemGetAddressRange_v2,
-        cuMemGetAddressRange_v2In {
-            dptr: CudaEncode::encode(dptr),
-        },
-    )?;
-    *pbase = CudaEncode::decode(result.pbase);
-    *psize = result.psize.to_native() as usize;
+    let mut state = GlobalState::get()?.lock().map_err(|_| CUerror::UNKNOWN)?;
+    let (base, size) = state
+        .server
+        .address_range(CudaEncode::encode(dptr).to_native())?;
+    *pbase = CudaEncode::decode(base.into());
+    *psize = size as usize;
     Ok(())
 }
 
@@ -1044,6 +1050,7 @@ pub(crate) fn cu_module_unload(hmod: cuda_types::cuda::CUmodule) -> Result<(), C
 
 pub(crate) fn cu_ctx_destroy_v2(ctx: cuda_types::cuda::CUcontext) -> Result<(), CUerror> {
     let mut global_state = GlobalState::get()?.lock().map_err(|_| CUerror::UNKNOWN)?;
+    global_state.server.invalidate_ranges();
     global_state.context_state.remove(&ctx);
     // TODO: keep track of which allocations are on which context
     Ok(())
