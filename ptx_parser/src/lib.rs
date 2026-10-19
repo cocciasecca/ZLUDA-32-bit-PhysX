@@ -4,7 +4,7 @@ use ptx_parser_macros::derive_parser;
 use rustc_hash::FxHashMap;
 use std::fmt::Debug;
 use std::num::{NonZeroU8, ParseFloatError, ParseIntError};
-use std::{iter, usize};
+use std::iter;
 use winnow::ascii::dec_uint;
 use winnow::combinator::*;
 use winnow::error::{ErrMode, ErrorKind};
