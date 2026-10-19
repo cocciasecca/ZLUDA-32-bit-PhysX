@@ -4,6 +4,8 @@
 #[cfg(feature = "physx-diagnostics")]
 mod diagnostics;
 #[cfg(feature = "physx-diagnostics")]
+mod kernel_textures;
+#[cfg(feature = "physx-diagnostics")]
 mod texture_diagnostics;
 #[cfg(feature = "physx-texture-reuse")]
 mod texture_reuse;
@@ -151,6 +153,8 @@ impl ModuleLaunchData {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let module_data = Module {
+            #[cfg(feature = "physx-diagnostics")]
+            kernel_textures: BTreeMap::new(),
             globals: Rc::new(globals),
             texrefs: FxHashMap::default(),
         };
@@ -160,6 +164,8 @@ impl ModuleLaunchData {
 }
 
 struct Module {
+    #[cfg(feature = "physx-diagnostics")]
+    kernel_textures: BTreeMap<String, kernel_textures::Usage>,
     globals: Rc<Vec<Global>>,
     texrefs: FxHashMap<Vec<u8>, u32>,
 }
@@ -177,6 +183,8 @@ impl Global {
 }
 
 struct Function {
+    #[cfg(feature = "physx-diagnostics")]
+    texture_usage: kernel_textures::Usage,
     globals: Rc<Vec<Global>>,
 }
 
@@ -331,7 +339,7 @@ fn main() -> std::io::Result<()> {
             continue;
         }
         #[cfg(feature = "physx-texture-reuse")]
-        if let Err(error) = state.texture_reuse_barrier(opcode) {
+        if let Err(error) = state.texture_reuse_barrier(opcode, &local) {
             remote.shared_memory.write_header(error.0.get());
             unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
             continue;
@@ -1168,6 +1176,19 @@ fn cu_module_get_function(
         .functions
         .entry(hfunc)
         .or_insert_with(|| Function {
+            #[cfg(feature = "physx-diagnostics")]
+            texture_usage: state.modules.modules[&CUmodule(hmod)]
+                .kernel_textures
+                .get(
+                    input
+                        .name
+                        .as_slice()
+                        .strip_suffix(&[0])
+                        .and_then(|n| std::str::from_utf8(n).ok())
+                        .unwrap_or(""),
+                )
+                .copied()
+                .unwrap_or(kernel_textures::Usage::Unknown),
             globals: Rc::clone(&state.modules.modules[&CUmodule(hmod)].globals),
         });
     Ok(cuModuleGetFunctionOut {
@@ -1182,6 +1203,15 @@ fn cu_module_load_data(
     let mut module = unsafe { mem::zeroed() };
     unsafe { cuModuleLoadData(&mut module, input.image.as_ptr().cast()) }?;
     unsafe { state.modules.new_module(&mut state.devmemory, module) }?;
+    #[cfg(feature = "physx-diagnostics")]
+    {
+        state
+            .modules
+            .modules
+            .get_mut(&module)
+            .unwrap()
+            .kernel_textures = kernel_textures::analyze(input.image.as_slice());
+    }
     Ok(cuModuleLoadDataOut {
         module: u32_le::from_native(state.handles.insert(module.0)),
     })
@@ -1499,7 +1529,7 @@ impl texture_reuse::Backend for BridgeTextures<'_> {
 
 #[cfg(feature = "physx-texture-reuse")]
 impl State {
-    fn texture_reuse_barrier(&mut self, opcode: u32) -> Result<(), CUerror> {
+    fn texture_reuse_barrier(&mut self, opcode: u32, local: &Endpoint) -> Result<(), CUerror> {
         use texture_reuse::Boundary;
         let boundary = match Opcode::from_repr(opcode) {
             Some(
@@ -1534,12 +1564,37 @@ impl State {
         if texture_reuse::can_defer(boundary, self.retain_textures_across_transfers) {
             return Ok(());
         }
+        let kernel_drain_label = if matches!(boundary, Boundary::Kernel)
+            && self.texture_reuse.as_ref().is_some_and(|c| c.has_pending())
+        {
+            // Input is framed: use the same deserializer as normal dispatch.
+            // This read-only classification never changes whether we drain.
+            let input = local.shared_memory.deserialize_body2::<cuLaunchKernelIn>();
+            let usage = self
+                .handles
+                .get(input.f.to_native())
+                .ok()
+                .and_then(|f| self.modules.functions.get(&CUfunction(f)))
+                .map(|f| f.texture_usage)
+                .unwrap_or(kernel_textures::Usage::Unknown);
+            match usage {
+                kernel_textures::Usage::NoTextureInstructions => {
+                    "texture_reuse/drain_before_kernel/no_texture_instructions"
+                }
+                kernel_textures::Usage::TextureInstructions => {
+                    "texture_reuse/drain_before_kernel/texture_instructions"
+                }
+                kernel_textures::Usage::Unknown => "texture_reuse/drain_before_kernel/unknown",
+            }
+        } else {
+            "texture_reuse/drain_before_kernel"
+        };
         if let Some(cache) = self.texture_reuse.as_mut() {
             if cache.has_pending() {
                 let timer = diagnostics::Timer::start(match boundary {
                     Boundary::Transfer => "texture_reuse/drain_before_transfer",
                     Boundary::Synchronize => "texture_reuse/drain_before_sync",
-                    Boundary::Kernel => "texture_reuse/drain_before_kernel",
+                    Boundary::Kernel => kernel_drain_label,
                     Boundary::Lifetime => "texture_reuse/drain_before_lifetime",
                     _ => "texture_reuse/drain_before_other",
                 });
