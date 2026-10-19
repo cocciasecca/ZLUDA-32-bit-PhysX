@@ -55,6 +55,10 @@ impl Recorder {
         let epoch = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_nanos();
         writeln!(file, "# pid={},unix_ns={epoch},git={}", std::process::id(),
             option_env!("VERGEN_GIT_SHA").unwrap_or("standalone-test")).ok()?;
+        writeln!(file, "# texture_reuse_feature={},texture_reuse_enabled={}",
+            cfg!(feature = "physx-texture-reuse"),
+            cfg!(feature = "physx-texture-reuse") && std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE").as_deref() == Ok("1")
+        ).ok()?;
         writeln!(file, "window_start_ns,window_end_ns,request,calls,errors,total_ns,max_ns").ok()?;
         let origin = Instant::now();
         Some(Self { file, origin, window: origin, stats: BTreeMap::new() })

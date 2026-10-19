@@ -216,16 +216,29 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:RUNNER_TEMP/texture-diagnostics-tests.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test conservative texture reuse
+        shell: pwsh
+        run: |
+          rustc --edition=2021 --test zluda64_server/src/texture_reuse.rs -o "$env:RUNNER_TEMP/texture-reuse-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP/texture-reuse-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build control and diagnostic servers
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force artifacts/control, artifacts/diagnostic, artifacts/32 | Out-Null
+          New-Item -ItemType Directory -Force artifacts/control, artifacts/diagnostic, artifacts/reuse, artifacts/32 | Out-Null
           cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe artifacts/control/
           cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-diagnostics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe artifacts/diagnostic/
+      - name: Build opt-in texture reuse prototype
+        shell: pwsh
+        run: |
+          cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-texture-reuse
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe artifacts/reuse/
       - name: Build matching 32-bit proxy
         shell: pwsh
         run: |
@@ -240,6 +253,9 @@ jobs:
             "Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
             "Target: x86_64-pc-windows-msvc; profile: release; Cargo.lock: --locked"
             "Control: features omitted; diagnostic: physx-diagnostics enabled"
+            "Reuse: physx-texture-reuse feature; additionally requires ZLUDA_PHYSX_TEXTURE_REUSE=1"
+            "Reuse is an UNVALIDATED GPU prototype: preserves explicit barriers and defers native texture unbind within restricted bridge sequences."
+            "Reuse retained resources bounded to 64 texture handles; do not enable without controlled correctness and frame-time checks."
             (rustc --version)
             (cargo --version)
             ""

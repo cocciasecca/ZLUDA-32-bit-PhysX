@@ -5,6 +5,8 @@
 mod diagnostics;
 #[cfg(feature = "physx-diagnostics")]
 mod texture_diagnostics;
+#[cfg(feature = "physx-texture-reuse")]
+mod texture_reuse;
 
 use cuda_macros::cuda_function_declarations;
 use cuda_types::cuda::*;
@@ -27,6 +29,8 @@ use windows::Win32::System::Threading::*;
 use zluda_server_common::*;
 
 struct State {
+    #[cfg(feature = "physx-texture-reuse")]
+    texture_reuse: Option<texture_reuse::TextureReuse>,
     #[cfg(feature = "physx-diagnostics")]
     texture_history: texture_diagnostics::TextureHistory,
     ctx: CUcontext,
@@ -274,6 +278,9 @@ impl State {
         unsafe { cuDevicePrimaryCtxRetain(&mut ctx, device) }?;
         unsafe { cuCtxSetCurrent(ctx) }?;
         Ok(Self {
+            #[cfg(feature = "physx-texture-reuse")]
+            texture_reuse: (std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE").as_deref() == Ok("1"))
+                .then(texture_reuse::TextureReuse::default),
             #[cfg(feature = "physx-diagnostics")]
             texture_history: texture_diagnostics::TextureHistory::default(),
             ctx,
@@ -315,6 +322,12 @@ fn main() -> std::io::Result<()> {
                 unsafe { String::from_utf8_unchecked(local.shared_memory.read_buffer().to_vec()) };
             let new_shmem = unsafe { SharedMemory::open(new_shmem_name, None) }?;
             local.shared_memory = new_shmem;
+            continue;
+        }
+        #[cfg(feature = "physx-texture-reuse")]
+        if let Err(error) = state.texture_reuse_barrier(opcode) {
+            remote.shared_memory.write_header(error.0.get());
+            unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
             continue;
         }
         match Opcode::from_repr(opcode) {
@@ -859,6 +872,20 @@ fn cu_tex_ref_set_format(
     state: &mut State,
     input: &ArchivedcuTexRefSetFormatIn,
 ) -> Result<cuTexRefSetFormatOut, CUerror> {
+    #[cfg(feature = "physx-texture-reuse")]
+    if let Some(cache) = state.texture_reuse.as_mut() {
+        let mut backend = BridgeTextures {
+            handles: &state.handles,
+            devmemory: &state.devmemory,
+        };
+        cache.format(
+            &mut backend,
+            input.hTexRef.to_native(),
+            input.fmt.to_native(),
+            input.NumPackedComponents.to_native(),
+        )?;
+        return Ok(cuTexRefSetFormatOut {});
+    }
     let tex_ref = state.handles.get(input.hTexRef.to_native())?;
     unsafe {
         cuTexRefSetFormat(
@@ -874,6 +901,19 @@ fn cu_tex_ref_set_flags(
     state: &mut State,
     input: &ArchivedcuTexRefSetFlagsIn,
 ) -> Result<cuTexRefSetFlagsOut, CUerror> {
+    #[cfg(feature = "physx-texture-reuse")]
+    if let Some(cache) = state.texture_reuse.as_mut() {
+        let mut backend = BridgeTextures {
+            handles: &state.handles,
+            devmemory: &state.devmemory,
+        };
+        cache.flags(
+            &mut backend,
+            input.hTexRef.to_native(),
+            input.Flags.to_native(),
+        )?;
+        return Ok(cuTexRefSetFlagsOut {});
+    }
     let tex_ref = state.handles.get(input.hTexRef.to_native())?;
     unsafe { cuTexRefSetFlags(tex_ref, input.Flags.to_native()) }?;
     Ok(cuTexRefSetFlagsOut {})
@@ -883,17 +923,22 @@ fn cu_tex_ref_set_address_v2(
     state: &mut State,
     input: &ArchivedcuTexRefSetAddress_v2In,
 ) -> Result<cuTexRefSetAddress_v2Out, CUerror> {
-    let mut byte_offset = 0;
-    let dptr = input.dptr.to_native();
-    let dptr = CUdeviceptr_v2(state.devmemory.translate(dptr)?);
-    unsafe {
-        cuTexRefSetAddress_v2(
-            &mut byte_offset,
-            state.handles.get(input.hTexRef.to_native())?,
-            dptr,
-            input.bytes.to_native() as usize,
-        )
-    }?;
+    let handle = input.hTexRef.to_native();
+    let pointer = input.dptr.to_native();
+    let bytes = input.bytes.to_native();
+    #[cfg(feature = "physx-texture-reuse")]
+    let byte_offset = if let Some(cache) = state.texture_reuse.as_mut() {
+        let mut backend = BridgeTextures {
+            handles: &state.handles,
+            devmemory: &state.devmemory,
+        };
+        cache.address(&mut backend, handle, pointer, bytes)?
+    } else {
+        texture_address_native(&state.handles, &state.devmemory, handle, pointer, bytes)?
+    };
+    #[cfg(not(feature = "physx-texture-reuse"))]
+    let byte_offset =
+        texture_address_native(&state.handles, &state.devmemory, handle, pointer, bytes)?;
     #[cfg(feature = "physx-diagnostics")]
     state.texture_history.succeeded(
         input.hTexRef.to_native(),
@@ -1389,4 +1434,84 @@ cuda_function_declarations! {
         cuDevicePrimaryCtxRetain,
         cuCtxSetCurrent,
     ]
+}
+
+fn texture_address_native(
+    handles: &HandlePool,
+    devmemory: &Allocator,
+    handle: u32,
+    pointer: u32,
+    bytes: u32,
+) -> Result<u32, CUerror> {
+    let mut offset = 0;
+    let pointer = CUdeviceptr_v2(devmemory.translate(pointer)?);
+    unsafe { cuTexRefSetAddress_v2(&mut offset, handles.get(handle)?, pointer, bytes as usize) }?;
+    Ok(offset as u32)
+}
+
+#[cfg(feature = "physx-texture-reuse")]
+struct BridgeTextures<'a> {
+    handles: &'a HandlePool,
+    devmemory: &'a Allocator,
+}
+
+#[cfg(feature = "physx-texture-reuse")]
+impl texture_reuse::Backend for BridgeTextures<'_> {
+    type Error = CUerror;
+    fn synchronize(&mut self) -> Result<(), CUerror> {
+        unsafe { cuCtxSynchronize() }
+    }
+    fn address(&mut self, handle: u32, pointer: u32, bytes: u32) -> Result<u32, CUerror> {
+        texture_address_native(self.handles, self.devmemory, handle, pointer, bytes)
+    }
+    fn flags(&mut self, handle: u32, flags: u32) -> Result<(), CUerror> {
+        unsafe { cuTexRefSetFlags(self.handles.get(handle)?, flags) }
+    }
+    fn format(&mut self, handle: u32, format: u32, channels: i32) -> Result<(), CUerror> {
+        unsafe { cuTexRefSetFormat(self.handles.get(handle)?, CUarray_format(format), channels) }
+    }
+}
+
+#[cfg(feature = "physx-texture-reuse")]
+impl State {
+    fn texture_reuse_barrier(&mut self, opcode: u32) -> Result<(), CUerror> {
+        // These are the only operations permitted while native unbind is deferred.
+        // All other requests, including launches/copies/sync/unknown operations,
+        // first restore the backend's logically unbound state.
+        if matches!(
+            Opcode::from_repr(opcode),
+            Some(
+                Opcode::cuTexRefSetAddress_v2
+                    | Opcode::cuTexRefSetFlags
+                    | Opcode::cuTexRefSetFormat
+                    | Opcode::cuMemGetAddressRange_v2
+            )
+        ) {
+            return Ok(());
+        }
+        if let Some(cache) = self.texture_reuse.as_mut() {
+            if cache.has_pending() {
+                let timer = diagnostics::Timer::start("texture_reuse/drain_before_request");
+                let mut backend = BridgeTextures {
+                    handles: &self.handles,
+                    devmemory: &self.devmemory,
+                };
+                let result = cache.drain(&mut backend);
+                timer.finish(result.as_ref().err().map_or(0, |error| error.0.get()));
+                result?;
+            }
+            if matches!(
+                Opcode::from_repr(opcode),
+                Some(
+                    Opcode::cuMemFree_v2
+                        | Opcode::cuModuleUnload
+                        | Opcode::cuCtxDetach
+                        | Opcode::cuInit
+                )
+            ) {
+                cache.invalidate();
+            }
+        }
+        Ok(())
+    }
 }
