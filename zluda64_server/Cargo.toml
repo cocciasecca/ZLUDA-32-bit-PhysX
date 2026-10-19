@@ -34,7 +34,7 @@ windows_only = true
 
 [features]
 # Aggregated diagnostics; omitted entirely from normal builds.
-physx-diagnostics = ["dep:ptx_parser"]
+physx-diagnostics = []
 
 # Experimental reuse is also gated at runtime by ZLUDA_PHYSX_TEXTURE_REUSE=1.
-physx-texture-reuse = ["physx-diagnostics"]
+physx-texture-reuse = ["physx-diagnostics", "dep:ptx_parser"]

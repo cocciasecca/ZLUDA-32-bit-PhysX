@@ -3,7 +3,7 @@
 
 #[cfg(feature = "physx-diagnostics")]
 mod diagnostics;
-#[cfg(feature = "physx-diagnostics")]
+#[cfg(feature = "physx-texture-reuse")]
 mod kernel_textures;
 #[cfg(feature = "physx-diagnostics")]
 mod texture_diagnostics;
@@ -153,7 +153,7 @@ impl ModuleLaunchData {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let module_data = Module {
-            #[cfg(feature = "physx-diagnostics")]
+            #[cfg(feature = "physx-texture-reuse")]
             kernel_textures: BTreeMap::new(),
             globals: Rc::new(globals),
             texrefs: FxHashMap::default(),
@@ -164,7 +164,7 @@ impl ModuleLaunchData {
 }
 
 struct Module {
-    #[cfg(feature = "physx-diagnostics")]
+    #[cfg(feature = "physx-texture-reuse")]
     kernel_textures: BTreeMap<String, kernel_textures::Usage>,
     globals: Rc<Vec<Global>>,
     texrefs: FxHashMap<Vec<u8>, u32>,
@@ -183,7 +183,7 @@ impl Global {
 }
 
 struct Function {
-    #[cfg(feature = "physx-diagnostics")]
+    #[cfg(feature = "physx-texture-reuse")]
     texture_usage: kernel_textures::Usage,
     globals: Rc<Vec<Global>>,
 }
@@ -1182,7 +1182,7 @@ fn cu_module_get_function(
         .functions
         .entry(hfunc)
         .or_insert_with(|| Function {
-            #[cfg(feature = "physx-diagnostics")]
+            #[cfg(feature = "physx-texture-reuse")]
             texture_usage: state.modules.modules[&CUmodule(hmod)]
                 .kernel_textures
                 .get(
@@ -1209,7 +1209,7 @@ fn cu_module_load_data(
     let mut module = unsafe { mem::zeroed() };
     unsafe { cuModuleLoadData(&mut module, input.image.as_ptr().cast()) }?;
     unsafe { state.modules.new_module(&mut state.devmemory, module) }?;
-    #[cfg(feature = "physx-diagnostics")]
+    #[cfg(feature = "physx-texture-reuse")]
     {
         state
             .modules
