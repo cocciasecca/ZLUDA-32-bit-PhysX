@@ -687,6 +687,12 @@ fn cu_module_unload(
     state.texture_history.clear();
     let hmod = CUmodule(state.handles.remove(input.hmod.to_native())?);
     if let Some(module) = state.modules.modules.remove(&hmod) {
+        // Native function addresses may be reused after unload. Do not retain
+        // analysis or launch metadata associated with the old module.
+        state
+            .modules
+            .functions
+            .retain(|_, f| !Rc::ptr_eq(&f.globals, &module.globals));
         for global in module.globals.iter() {
             state
                 .devmemory

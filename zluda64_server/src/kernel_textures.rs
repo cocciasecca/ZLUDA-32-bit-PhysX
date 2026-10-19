@@ -83,7 +83,12 @@ fn resolve(
     nodes: &BTreeMap<String, Node>,
     visiting: &mut BTreeSet<String>,
     depth: usize,
+    budget: &mut usize,
 ) -> Usage {
+    if *budget == 0 {
+        return Usage::Unknown;
+    }
+    *budget -= 1;
     if depth > 128 || !visiting.insert(name.to_owned()) {
         return Usage::Unknown;
     }
@@ -97,7 +102,7 @@ fn resolve(
                 Usage::NoTextureInstructions
             };
             for callee in &n.calls {
-                match resolve(callee, nodes, visiting, depth + 1) {
+                match resolve(callee, nodes, visiting, depth + 1, budget) {
                     Usage::TextureInstructions => {
                         result = Usage::TextureInstructions;
                         break;
@@ -151,7 +156,7 @@ pub fn analyze(image: &[u8]) -> BTreeMap<String, Usage> {
     kernels
         .into_iter()
         .map(|k| {
-            let usage = resolve(&k, &nodes, &mut BTreeSet::new(), 0);
+            let usage = resolve(&k, &nodes, &mut BTreeSet::new(), 0, &mut 4096);
             (k, usage)
         })
         .collect()
@@ -159,6 +164,27 @@ pub fn analyze(image: &[u8]) -> BTreeMap<String, Usage> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn real_texture_fixture_and_transitive_call() {
+        let fixture = include_str!("../../zluda/src/impl/test_ptx/tex_read_1d_int.ptx");
+        assert_eq!(
+            analyze(fixture.as_bytes()).get("tex_read_1d_int"),
+            Some(&Usage::TextureInstructions)
+        );
+        let with_helper =
+            fixture.replace(".visible .entry tex_read_1d_int", ".func tex_read_1d_int");
+        // Graph behavior is separately tested; fixture checks actual parser Tex AST.
+        assert!(analyze(with_helper.as_bytes()).is_empty());
+    }
+    #[test]
+    fn bounded_graph_work() {
+        let mut nodes = BTreeMap::new();
+        nodes.insert("k".into(), Node::default());
+        assert_eq!(
+            resolve("k", &nodes, &mut BTreeSet::new(), 0, &mut 0),
+            Usage::Unknown
+        );
+    }
     #[test]
     fn parsed_leaf_and_malformed_input() {
         let text =
@@ -182,18 +208,24 @@ mod tests {
             },
         );
         assert_eq!(
-            resolve("root", &n, &mut BTreeSet::new(), 0),
+            resolve("root", &n, &mut BTreeSet::new(), 0, &mut 4096),
             Usage::NoTextureInstructions
         );
         n.get_mut("leaf").unwrap().texture = true;
         assert_eq!(
-            resolve("root", &n, &mut BTreeSet::new(), 0),
+            resolve("root", &n, &mut BTreeSet::new(), 0, &mut 4096),
             Usage::TextureInstructions
         );
         n.remove("leaf");
-        assert_eq!(resolve("root", &n, &mut BTreeSet::new(), 0), Usage::Unknown);
+        assert_eq!(
+            resolve("root", &n, &mut BTreeSet::new(), 0, &mut 4096),
+            Usage::Unknown
+        );
         n.get_mut("root").unwrap().calls = BTreeSet::from(["root".into()]);
-        assert_eq!(resolve("root", &n, &mut BTreeSet::new(), 0), Usage::Unknown);
+        assert_eq!(
+            resolve("root", &n, &mut BTreeSet::new(), 0, &mut 4096),
+            Usage::Unknown
+        );
     }
     #[test]
     fn parsed_direct_call_and_unresolved_call() {

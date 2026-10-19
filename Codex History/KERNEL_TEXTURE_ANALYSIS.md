@@ -1,0 +1,9 @@
+# Kernel texture-instruction analysis (diagnostic only)
+
+Motivation: d9a0071 trial27–28userFPS, zero cached_rebind successes, 72.83%service in kernel-boundary drains. Need identify kernels causing those drains before changing ordering.
+
+Uses existing checked ptx_parser on original PTX sent by32bitproxy. Module load builds a conservative function call graph, recursively visits nested blocks, propagates Tex instructions through direct calls. Missing/extern/weak/duplicate definitions, recursive calls, depth/work limit and unclassified instructions are unknown; invalidUTF8/PTX or oversized input gives no classification (unknown fallback). Recognized ordinary operations are explicitly whitelisted. Analysis stored per module/function, module-unload removes corresponding function metadata to prevent reuse of stale classifications. No string/regex proof, no GPU code changes, no HIP changes.
+
+Three labels for pre-kernel drain: no_texture_instructions, texture_instructions, unknown. Shared launch input is viewed via existing zero-copy deserializer only if pending texture cleanup exists; no additional kernel argument copy. All existing drains still execute. Absence of Tex is only a diagnostic candidate: not proof of no descriptor/raw-memory access, escaped resource handles, or coherence effects. It MUST NOT be used to skip a drain without further analysis. Does not yet identify individual texture references or live binding sets. GPU timing remains unmeasured.
+
+Tests: real parser leaf/malformed input, direct/unresolved calls; synthetic transitive texture/unknown/recursion; added actual existing texturePTXfixture and boundedwork checks. Windows cargo tests build full server with feature, no GPU execution. Runtime remains installed d9a0071 with reuse/transfers/rangecacheON until closed-game update explicitly coordinated. Initial CI run39294010549; final fixes pending commit/build.
