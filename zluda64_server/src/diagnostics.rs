@@ -59,6 +59,8 @@ impl Recorder {
             cfg!(feature = "physx-texture-reuse"),
             cfg!(feature = "physx-texture-reuse") && std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE").as_deref() == Ok("1")
         ).ok()?;
+        writeln!(file, "# texture_reuse_transfers_requested={}",
+            std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS").as_deref() == Ok("1")).ok()?;
         writeln!(file, "window_start_ns,window_end_ns,request,calls,errors,total_ns,max_ns").ok()?;
         let origin = Instant::now();
         Some(Self { file, origin, window: origin, stats: BTreeMap::new() })

@@ -1,7 +1,25 @@
 //! Opt-in, bounded deferral within the serialized 32-bit bridge.
-//! This is not a general CUDA texture cache. Drain before every request except
-//! address/flags/format and the bridge's purely local address-range lookup.
+//! This is not a general CUDA texture cache. Kernel/lifetime/unknown boundaries
+//! always drain. An independent experimental flag permits data-transfer boundaries.
 use std::collections::BTreeMap;
+
+#[derive(Clone, Copy)]
+pub enum Boundary {
+    TextureMetadata,
+    Transfer,
+    Synchronize,
+    Kernel,
+    Lifetime,
+    Other,
+}
+
+pub fn can_defer(boundary: Boundary, retain_across_transfers: bool) -> bool {
+    match boundary {
+        Boundary::TextureMetadata => true,
+        Boundary::Transfer | Boundary::Synchronize => retain_across_transfers,
+        Boundary::Kernel | Boundary::Lifetime | Boundary::Other => false,
+    }
+}
 
 const LIMIT: usize = 64;
 
@@ -27,6 +45,15 @@ pub struct TextureReuse {
 }
 
 impl TextureReuse {
+    pub fn can_reuse(&self, handle: u32, pointer: u32, bytes: u32) -> bool {
+        pointer != 0
+            && self.entries.get(&handle).is_some_and(|e| {
+                e.pending
+                    && e.binding
+                        .is_some_and(|(p, b, _)| (p, b) == (pointer, bytes))
+            })
+    }
+
     pub fn has_pending(&self) -> bool {
         self.entries.values().any(|entry| entry.pending)
     }
@@ -150,6 +177,49 @@ impl TextureReuse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn transfer_policy_never_bypasses_kernel_lifetime_or_unknown() {
+        for enabled in [false, true] {
+            for boundary in [Boundary::Kernel, Boundary::Lifetime, Boundary::Other] {
+                assert!(!can_defer(boundary, enabled));
+            }
+            assert!(can_defer(Boundary::TextureMetadata, enabled));
+            assert_eq!(can_defer(Boundary::Transfer, enabled), enabled);
+            assert_eq!(can_defer(Boundary::Synchronize, enabled), enabled);
+        }
+    }
+
+    #[test]
+    fn transfer_between_unbind_and_rebind_retains_resource_but_not_barriers() {
+        for enabled in [false, true] {
+            let mut cache = TextureReuse::default();
+            let mut b = Mock::default();
+            let offset = cache.address(&mut b, 1, 256, 64).unwrap();
+            cache.address(&mut b, 1, 0, 0).unwrap();
+            if !can_defer(Boundary::Transfer, enabled) {
+                cache.drain(&mut b).unwrap();
+            }
+            // A transfer uses allocation addresses, not texture binding state.
+            b.calls.push("transfer".into());
+            let returned = cache.address(&mut b, 1, 256, 64).unwrap();
+            assert_eq!(returned, offset);
+            let unbinds = b
+                .calls
+                .iter()
+                .filter(|c| c.as_str() == "address:1:0:0")
+                .count();
+            assert_eq!(unbinds, if enabled { 0 } else { 1 });
+            assert_eq!(
+                b.calls.iter().filter(|c| c.as_str() == "sync").count(),
+                if enabled { 2 } else { 1 }
+            );
+            cache.address(&mut b, 1, 0, 0).unwrap();
+            assert!(!can_defer(Boundary::Kernel, enabled));
+            cache.drain(&mut b).unwrap();
+            assert!(b.bindings.is_empty());
+        }
+    }
 
     #[derive(Default)]
     struct Mock {

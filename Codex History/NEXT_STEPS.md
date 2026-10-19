@@ -109,3 +109,6 @@ User reports 21 FPS versus prior approximately 25. Verified active revision af21
 
 ## Reuse OFF control ready
 User confirmed game closed. Verified no Batman/server process; changed only experimental user_settings.py ZLUDA_PHYSX_TEXTURE_REUSE from 1 to 0 atomically and verified. Same af21634 binaries/proxy and diagnostics retained. Next user launch: verify CSV enabled=false, capture same scene and compare with ON user-reported21FPS. No restart performed.
+
+## Range cache installed on Legion
+User requested installation after reconnecting Legion. No Batman/server process found. Installed run39253109146 commit1900973007dfc0b0a07b7dc287d433d7b7886c32 diagnostic server and matching32bitproxy/default_pfx proxy. Cache ON, texture reuse OFF in experimental settings. Payload hashes verified on target; original tool manifest checked, COMGR preserved, prefix DLLs unchanged during install. Backup update-backup-39253109146 includes binaries/settings; update-manifest-39253109146.json records hashes. No game launched. Next user launch: confirm prefix proxy5141eeeba8494efc4506f7b9ff6b433f57dfcda252d6efd59b6aa2e0231162f5 and range-cache CSV enabled=true, collect hit ratio and same-scene timing/FPS; performance unvalidated.

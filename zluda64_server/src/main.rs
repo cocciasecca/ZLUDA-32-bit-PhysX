@@ -31,6 +31,8 @@ use zluda_server_common::*;
 struct State {
     #[cfg(feature = "physx-texture-reuse")]
     texture_reuse: Option<texture_reuse::TextureReuse>,
+    #[cfg(feature = "physx-texture-reuse")]
+    retain_textures_across_transfers: bool,
     #[cfg(feature = "physx-diagnostics")]
     texture_history: texture_diagnostics::TextureHistory,
     ctx: CUcontext,
@@ -279,6 +281,10 @@ impl State {
         unsafe { cuCtxSetCurrent(ctx) }?;
         Ok(Self {
             #[cfg(feature = "physx-texture-reuse")]
+            retain_textures_across_transfers: std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS")
+                .as_deref()
+                == Ok("1"),
+            #[cfg(feature = "physx-texture-reuse")]
             texture_reuse: (std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE").as_deref() == Ok("1"))
                 .then(texture_reuse::TextureReuse::default),
             #[cfg(feature = "physx-diagnostics")]
@@ -467,6 +473,25 @@ fn main() -> std::io::Result<()> {
                 #[cfg(feature = "physx-diagnostics")]
                 let name = {
                     let input: ArchivedcuTexRefSetAddress_v2In = local.shared_memory.read_body();
+                    #[cfg(feature = "physx-texture-reuse")]
+                    if state.texture_reuse.as_ref().is_some_and(|cache| {
+                        cache.can_reuse(
+                            input.hTexRef.to_native(),
+                            input.dptr.to_native(),
+                            input.bytes.to_native(),
+                        )
+                    }) {
+                        // Successful requests in this category skipped native rebinding;
+                        // failures (e.g. the retained sync) are counted separately.
+                        "texture_address/cached_rebind"
+                    } else {
+                        state.texture_history.classify(
+                            input.hTexRef.to_native(),
+                            input.dptr.to_native(),
+                            input.bytes.to_native(),
+                        )
+                    }
+                    #[cfg(not(feature = "physx-texture-reuse"))]
                     state.texture_history.classify(
                         input.hTexRef.to_native(),
                         input.dptr.to_native(),
@@ -1475,23 +1500,49 @@ impl texture_reuse::Backend for BridgeTextures<'_> {
 #[cfg(feature = "physx-texture-reuse")]
 impl State {
     fn texture_reuse_barrier(&mut self, opcode: u32) -> Result<(), CUerror> {
-        // These are the only operations permitted while native unbind is deferred.
-        // All other requests, including launches/copies/sync/unknown operations,
-        // first restore the backend's logically unbound state.
-        if matches!(
-            Opcode::from_repr(opcode),
+        use texture_reuse::Boundary;
+        let boundary = match Opcode::from_repr(opcode) {
             Some(
                 Opcode::cuTexRefSetAddress_v2
-                    | Opcode::cuTexRefSetFlags
-                    | Opcode::cuTexRefSetFormat
-                    | Opcode::cuMemGetAddressRange_v2
-            )
-        ) {
+                | Opcode::cuTexRefSetFlags
+                | Opcode::cuTexRefSetFormat
+                | Opcode::cuMemGetAddressRange_v2,
+            ) => Boundary::TextureMetadata,
+            Some(
+                Opcode::cuMemcpyHtoD_v2
+                | Opcode::cuMemcpyHtoDAsync_v2
+                | Opcode::cuMemcpyDtoHAsync_v2
+                | Opcode::cuMemcpyDtoD_v2
+                | Opcode::cuMemcpyDtoDAsync_v2
+                | Opcode::cuMemsetD8_v2,
+            ) => Boundary::Transfer,
+            Some(Opcode::cuCtxSynchronize) => Boundary::Synchronize,
+            Some(Opcode::cuLaunchKernel) => Boundary::Kernel,
+            Some(
+                Opcode::cuMemFree_v2
+                | Opcode::cuMemAlloc_v2
+                | Opcode::cuModuleUnload
+                | Opcode::cuModuleLoadData
+                | Opcode::cuCtxDetach
+                | Opcode::cuInit,
+            ) => Boundary::Lifetime,
+            _ => Boundary::Other,
+        };
+        // Copies/memsets use allocation addresses and do not observe texture
+        // bindings. They still execute normally, including existing syncs.
+        // Kernels, frees, unloads and all unknown requests ALWAYS drain first.
+        if texture_reuse::can_defer(boundary, self.retain_textures_across_transfers) {
             return Ok(());
         }
         if let Some(cache) = self.texture_reuse.as_mut() {
             if cache.has_pending() {
-                let timer = diagnostics::Timer::start("texture_reuse/drain_before_request");
+                let timer = diagnostics::Timer::start(match boundary {
+                    Boundary::Transfer => "texture_reuse/drain_before_transfer",
+                    Boundary::Synchronize => "texture_reuse/drain_before_sync",
+                    Boundary::Kernel => "texture_reuse/drain_before_kernel",
+                    Boundary::Lifetime => "texture_reuse/drain_before_lifetime",
+                    _ => "texture_reuse/drain_before_other",
+                });
                 let mut backend = BridgeTextures {
                     handles: &self.handles,
                     devmemory: &self.devmemory,
