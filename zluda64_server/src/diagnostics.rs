@@ -158,3 +158,14 @@ mod tests {
         std::fs::remove_file(path).unwrap();
     }
 }
+
+// Shadow counters have zero duration and must not enter service-time totals.
+#[cfg(feature = "physx-texture-reuse")]
+pub fn count(name: &'static str, count: usize) {
+    if count == 0 { return; }
+    RECORDER.with(|recorder| {
+        if let Some(recorder) = recorder.borrow_mut().as_mut() {
+            recorder.stats.entry(name).or_default().calls += count as u64;
+        }
+    });
+}

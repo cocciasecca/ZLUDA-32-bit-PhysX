@@ -9,6 +9,8 @@ mod kernel_textures;
 mod texture_diagnostics;
 #[cfg(feature = "physx-texture-reuse")]
 mod texture_reuse;
+#[cfg(feature = "physx-texture-reuse")]
+mod texture_shadow;
 
 use cuda_macros::cuda_function_declarations;
 use cuda_types::cuda::*;
@@ -31,6 +33,8 @@ use windows::Win32::System::Threading::*;
 use zluda_server_common::*;
 
 struct State {
+    #[cfg(feature = "physx-texture-reuse")]
+    texture_shadow: texture_shadow::Shadow,
     #[cfg(feature = "physx-texture-reuse")]
     texture_reuse: Option<texture_reuse::TextureReuse>,
     #[cfg(feature = "physx-texture-reuse")]
@@ -289,6 +293,8 @@ impl State {
         unsafe { cuCtxSetCurrent(ctx) }?;
         Ok(Self {
             #[cfg(feature = "physx-texture-reuse")]
+            texture_shadow: texture_shadow::Shadow::default(),
+            #[cfg(feature = "physx-texture-reuse")]
             retain_textures_across_transfers: std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS")
                 .as_deref()
                 == Ok("1"),
@@ -330,6 +336,10 @@ fn main() -> std::io::Result<()> {
     write_git_version(&mut remote)?;
     unsafe { WaitForSingleObject(*local.event, INFINITE) };
     loop {
+        #[cfg(feature = "physx-texture-reuse")]
+        if remote.shared_memory.read_header() != 0 {
+            diagnostics::count("shadow/error_reset", state.texture_shadow.boundary(false));
+        }
         let opcode = local.shared_memory.read_header();
         if opcode == u32::MAX {
             let new_shmem_name =
@@ -978,6 +988,10 @@ fn cu_tex_ref_set_address_v2(
     #[cfg(not(feature = "physx-texture-reuse"))]
     let byte_offset =
         texture_address_native(&state.handles, &state.devmemory, handle, pointer, bytes)?;
+    #[cfg(feature = "physx-texture-reuse")]
+    if let Some(event) = state.texture_shadow.address(handle, pointer, bytes) {
+        diagnostics::count(event, 1);
+    }
     #[cfg(feature = "physx-diagnostics")]
     state.texture_history.succeeded(
         input.hTexRef.to_native(),
@@ -1564,6 +1578,42 @@ impl State {
             ) => Boundary::Lifetime,
             _ => Boundary::Other,
         };
+        // Shadow events are counts, never saved-time estimates or permission to skip cleanup.
+        match Opcode::from_repr(opcode) {
+            Some(Opcode::cuTexRefSetFlags | Opcode::cuTexRefSetFormat) => {
+                let handle = if matches!(Opcode::from_repr(opcode), Some(Opcode::cuTexRefSetFlags))
+                {
+                    let input: ArchivedcuTexRefSetFlagsIn = local.shared_memory.read_body();
+                    input.hTexRef.to_native()
+                } else {
+                    let input: ArchivedcuTexRefSetFormatIn = local.shared_memory.read_body();
+                    input.hTexRef.to_native()
+                };
+                diagnostics::count(
+                    "shadow/configuration_end",
+                    self.texture_shadow.forget(handle),
+                );
+            }
+            _ if matches!(boundary, Boundary::Kernel) => {
+                let input = local.shared_memory.deserialize_body2::<cuLaunchKernelIn>();
+                let candidate = self
+                    .handles
+                    .get(input.f.to_native())
+                    .ok()
+                    .and_then(|f| self.modules.functions.get(&CUfunction(f)))
+                    .is_some_and(|f| {
+                        f.texture_usage == kernel_textures::Usage::NoTextureInstructions
+                    });
+                diagnostics::count("shadow/kernel_end", self.texture_shadow.boundary(candidate));
+            }
+            _ if !texture_reuse::can_defer(boundary, self.retain_textures_across_transfers) => {
+                diagnostics::count(
+                    "shadow/other_boundary_end",
+                    self.texture_shadow.boundary(false),
+                );
+            }
+            _ => (),
+        }
         // Copies/memsets use allocation addresses and do not observe texture
         // bindings. They still execute normally, including existing syncs.
         // Kernels, frees, unloads and all unknown requests ALWAYS drain first.
