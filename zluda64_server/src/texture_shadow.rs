@@ -26,9 +26,14 @@ impl Shadow {
                 .values()
                 .filter(|e| e.pending && e.crossed)
                 .count();
-            self.entries.clear();
+            self.entries.retain(|_, e| !e.pending);
             count
         }
+    }
+    pub fn reset(&mut self) -> usize {
+        let count = self.boundary(false);
+        self.entries.clear();
+        count
     }
     pub fn forget(&mut self, handle: u32) -> usize {
         usize::from(
@@ -68,6 +73,22 @@ impl Shadow {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn texture_kernel_keeps_active_binding_until_later_unbind() {
+        let mut s = Shadow::default();
+        s.address(1, 100, 32);
+        assert_eq!(s.boundary(false), 0); // Texture kernel uses active binding.
+        s.address(1, 0, 0);
+        s.boundary(true);
+        assert_eq!(
+            s.address(1, 100, 32),
+            Some("shadow/same_binding_after_candidate")
+        );
+        s.reset(); // Lifetime/error invalidates active bindings too.
+        s.address(1, 0, 0);
+        s.boundary(true);
+        assert_eq!(s.address(1, 100, 32), None);
+    }
     #[test]
     fn same_changed_and_repeated_unbind() {
         let mut s = Shadow::default();

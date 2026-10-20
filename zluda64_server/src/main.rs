@@ -338,7 +338,7 @@ fn main() -> std::io::Result<()> {
     loop {
         #[cfg(feature = "physx-texture-reuse")]
         if remote.shared_memory.read_header() != 0 {
-            diagnostics::count("shadow/error_reset", state.texture_shadow.boundary(false));
+            diagnostics::count("shadow/error_reset", state.texture_shadow.reset());
         }
         let opcode = local.shared_memory.read_header();
         if opcode == u32::MAX {
@@ -1609,7 +1609,7 @@ impl State {
             _ if !texture_reuse::can_defer(boundary, self.retain_textures_across_transfers) => {
                 diagnostics::count(
                     "shadow/other_boundary_end",
-                    self.texture_shadow.boundary(false),
+                    self.texture_shadow.reset(),
                 );
             }
             _ => (),
