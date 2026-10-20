@@ -1,6 +1,6 @@
 # ZLUDA PhysX performance investigation — Legion Go
 
-This folder is a self-contained handoff for Codex. Read all Markdown files before making changes.
+This folder is a self-contained handoff for Codex. Start with [CURRENT.md](CURRENT.md) for the installed build, prepared package and next action; consult historical notes for evidence and context.
 
 ## Goal
 
