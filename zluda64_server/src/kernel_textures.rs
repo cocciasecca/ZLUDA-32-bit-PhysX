@@ -229,12 +229,12 @@ mod tests {
     }
     #[test]
     fn parsed_direct_call_and_unresolved_call() {
-        let text=b".version 6.0\n.target sm_30\n.address_size 32\n.func helper() { ret; }\n.visible .entry root() { call helper, (); ret; }";
+        let text=b".version 6.0\n.target sm_30\n.address_size 32\n.func helper() { ret; }\n.visible .entry root() { call helper; ret; }";
         assert_eq!(
             analyze(text).get("root"),
             Some(&Usage::NoTextureInstructions)
         );
-        let text=b".version 6.0\n.target sm_30\n.address_size 32\n.extern .func helper();\n.visible .entry root() { call helper, (); ret; }";
+        let text=b".version 6.0\n.target sm_30\n.address_size 32\n.extern .func helper();\n.visible .entry root() { call helper; ret; }";
         assert_eq!(analyze(text).get("root"), Some(&Usage::Unknown));
     }
 }
