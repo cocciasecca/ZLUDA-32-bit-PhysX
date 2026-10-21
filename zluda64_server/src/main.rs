@@ -4,6 +4,8 @@
 #[cfg(feature = "physx-diagnostics")]
 mod diagnostics;
 #[cfg(feature = "physx-diagnostics")]
+mod pool_capture;
+#[cfg(feature = "physx-diagnostics")]
 mod texture_diagnostics;
 #[cfg(feature = "physx-diagnostics")]
 mod texture_global_probe;
@@ -31,6 +33,8 @@ use windows::Win32::System::Threading::*;
 use zluda_server_common::*;
 
 struct State {
+    #[cfg(feature = "physx-diagnostics")]
+    pool_capture: Option<pool_capture::Capture>,
     #[cfg(feature = "physx-diagnostics")]
     texture_global_probe: Option<texture_global_probe::Probe>,
     #[cfg(feature = "physx-diagnostics")]
@@ -96,6 +100,8 @@ impl ModuleLaunchData {
         unsafe { cuGetExportTable(&mut zluda32_ptr, &dark_api::zluda32::Zluda32Internal::GUID) }?;
         let zluda32 = unsafe { dark_api::zluda32::Zluda32Internal::new(zluda32_ptr) };
         Ok(Self {
+            #[cfg(feature = "physx-diagnostics")]
+            pool_capture: pool_capture::Capture::open(),
             dark_api: zluda32,
             modules: FxHashMap::default(),
             functions: FxHashMap::default(),
@@ -320,7 +326,23 @@ fn main() -> std::io::Result<()> {
     let mut arena = stumpalo::Arena::new();
     write_git_version(&mut remote)?;
     unsafe { WaitForSingleObject(*local.event, INFINITE) };
+    #[cfg(feature = "physx-diagnostics")]
+    let mut pending_capture = None;
     loop {
+        #[cfg(feature = "physx-diagnostics")]
+        if let (Some(capture), Some(event)) = (state.pool_capture.as_mut(), pending_capture.take())
+        {
+            if matches!(event, pool_capture::Event::Bind(_,p,_) if p!=0)
+                && remote.shared_memory.read_header() == 0
+            {
+                let output: ArchivedcuTexRefSetAddress_v2Out = remote.shared_memory.read_body();
+                capture.observe(
+                    pool_capture::Event::Offset(output.ByteOffset.to_native()),
+                    0,
+                );
+            }
+            capture.observe(event, remote.shared_memory.read_header());
+        }
         let opcode = local.shared_memory.read_header();
         if opcode == u32::MAX {
             let new_shmem_name =
@@ -328,6 +350,50 @@ fn main() -> std::io::Result<()> {
             let new_shmem = unsafe { SharedMemory::open(new_shmem_name, None) }?;
             local.shared_memory = new_shmem;
             continue;
+        }
+        #[cfg(feature = "physx-diagnostics")]
+        if state.pool_capture.is_some() {
+            use pool_capture::Event;
+            pending_capture = match Opcode::from_repr(opcode) {
+                Some(Opcode::cuTexRefSetAddress_v2) => {
+                    let i: ArchivedcuTexRefSetAddress_v2In = local.shared_memory.read_body();
+                    Some(Event::Bind(
+                        i.hTexRef.to_native(),
+                        i.dptr.to_native(),
+                        i.bytes.to_native(),
+                    ))
+                }
+                Some(Opcode::cuTexRefSetFlags) => {
+                    let i: ArchivedcuTexRefSetFlagsIn = local.shared_memory.read_body();
+                    Some(Event::Flags(i.hTexRef.to_native(), i.Flags.to_native()))
+                }
+                Some(Opcode::cuTexRefSetFormat) => {
+                    let i: ArchivedcuTexRefSetFormatIn = local.shared_memory.read_body();
+                    Some(Event::Format(
+                        i.hTexRef.to_native(),
+                        i.fmt.to_native(),
+                        i.NumPackedComponents.to_native(),
+                    ))
+                }
+                Some(Opcode::cuLaunchKernel) => {
+                    let i = local.shared_memory.deserialize_body2::<cuLaunchKernelIn>();
+                    Some(Event::Kernel(i.f.to_native()))
+                }
+                Some(
+                    Opcode::cuMemcpyHtoD_v2
+                    | Opcode::cuMemcpyHtoDAsync_v2
+                    | Opcode::cuMemcpyDtoHAsync_v2
+                    | Opcode::cuMemcpyDtoD_v2
+                    | Opcode::cuMemcpyDtoDAsync_v2
+                    | Opcode::cuMemsetD8_v2
+                    | Opcode::cuCtxSynchronize
+                    | Opcode::cuMemGetAddressRange_v2
+                    | Opcode::cuModuleGetTexRef
+                    | Opcode::cuModuleGetFunction
+                    | Opcode::zludaGetFunctionArgs,
+                ) => Some(Event::Other(opcode)),
+                _ => Some(Event::Reset),
+            };
         }
         match Opcode::from_repr(opcode) {
             Some(Opcode::cuInit) => {
@@ -1071,6 +1137,10 @@ fn cu_module_get_tex_ref(
             *entry.insert(handle)
         }
     };
+    #[cfg(feature = "physx-diagnostics")]
+    if let Some(capture) = state.pool_capture.as_mut() {
+        capture.name(false, texref, name.as_slice());
+    }
     Ok(cuModuleGetTexRefOut {
         texref: u32_le::from_native(texref),
     })
@@ -1138,8 +1208,13 @@ fn cu_module_get_function(
         .or_insert_with(|| Function {
             globals: Rc::clone(&state.modules.modules[&CUmodule(hmod)].globals),
         });
+    let handle = state.handles.insert(hfunc.0);
+    #[cfg(feature = "physx-diagnostics")]
+    if let Some(capture) = state.pool_capture.as_mut() {
+        capture.name(true, handle, input.name.as_slice());
+    }
     Ok(cuModuleGetFunctionOut {
-        hfunc: u32_le::from_native(state.handles.insert(hfunc.0)),
+        hfunc: u32_le::from_native(handle),
     })
 }
 

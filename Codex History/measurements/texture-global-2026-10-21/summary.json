@@ -1,0 +1,78 @@
+{
+  "user_fps": 21,
+  "probe_matches": [
+    {
+      "handle": "536870969",
+      "symbol_hex": "636946726f6d5369546578",
+      "status": "object_matches_candidate_layout",
+      "global_bytes": "88",
+      "host_object": "7f8aed8da000",
+      "device_object": "7f8aed8da000",
+      "symbol": "ciFromSiTex"
+    },
+    {
+      "handle": "536870970",
+      "symbol_hex": "756946726f6d5369546578",
+      "status": "object_matches_candidate_layout",
+      "global_bytes": "88",
+      "host_object": "7f8aed8c2000",
+      "device_object": "7f8aed8c2000",
+      "symbol": "uiFromSiTex"
+    },
+    {
+      "handle": "536870973",
+      "symbol_hex": "706f736974696f6e5369546578",
+      "status": "object_matches_candidate_layout",
+      "global_bytes": "88",
+      "host_object": "7f8aed8aa000",
+      "device_object": "7f8aed8aa000",
+      "symbol": "positionSiTex"
+    },
+    {
+      "handle": "536870974",
+      "symbol_hex": "6e6577506f736974696f6e5369546578",
+      "status": "object_matches_candidate_layout",
+      "global_bytes": "88",
+      "host_object": "7f8aed898000",
+      "device_object": "7f8aed898000",
+      "symbol": "newPositionSiTex"
+    },
+    {
+      "handle": "536870975",
+      "symbol_hex": "6f726967696e616c506f736974696f6e5369546578",
+      "status": "object_matches_candidate_layout",
+      "global_bytes": "88",
+      "host_object": "7f8aed5f6000",
+      "device_object": "7f8aed5f6000",
+      "symbol": "originalPositionSiTex"
+    },
+    {
+      "handle": "536870972",
+      "symbol_hex": "696e764d6173735369546578",
+      "status": "object_matches_candidate_layout",
+      "global_bytes": "88",
+      "host_object": "7f8aed5de000",
+      "device_object": "7f8aed5de000",
+      "symbol": "invMassSiTex"
+    },
+    {
+      "handle": "536870931",
+      "symbol_hex": "7465785368617065416162624d696e",
+      "status": "object_matches_candidate_layout",
+      "global_bytes": "88",
+      "host_object": "7f8aed8da000",
+      "device_object": "7f8aed8da000",
+      "symbol": "texShapeAabbMin"
+    },
+    {
+      "handle": "536870932",
+      "symbol_hex": "7465785368617065416162624d6178",
+      "status": "object_matches_candidate_layout",
+      "global_bytes": "88",
+      "host_object": "7f8aed8c2000",
+      "device_object": "7f8aed8c2000",
+      "symbol": "texShapeAabbMax"
+    }
+  ],
+  "interpretation": "Eight sampled globals accessible via native API, size88 and nonzero object field match. This does not validate writes/pooling or explain FPS difference. Sampling stops at eight handles."
+}

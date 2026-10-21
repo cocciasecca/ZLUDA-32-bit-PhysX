@@ -18,7 +18,7 @@ def run(*args):
 
 
 def deploy(run_id, host='deck@192.168.10.67', key=None, profile='baseline'):
-    if profile not in ('baseline', 'diagnostic', 'unbind-probe', 'texture-global'):
+    if profile not in ('baseline', 'diagnostic', 'unbind-probe', 'texture-global', 'pool-capture'):
         raise RuntimeError('Profilo non valido')
     run_id = str(run_id)
     if not run_id.isdecimal() or not re.fullmatch(r'[A-Za-z0-9_.-]+@[A-Za-z0-9.-]+', host):
@@ -69,6 +69,6 @@ if __name__ == '__main__':
     parser.add_argument('run_id')
     parser.add_argument('--host', default='deck@192.168.10.67')
     parser.add_argument('--key')
-    parser.add_argument('--profile', choices=['baseline','diagnostic','unbind-probe','texture-global'], default='baseline')
+    parser.add_argument('--profile', choices=['baseline','diagnostic','unbind-probe','texture-global', 'pool-capture'], default='baseline')
     args = parser.parse_args()
     deploy(args.run_id, args.host, args.key, args.profile)
