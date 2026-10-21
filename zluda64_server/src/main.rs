@@ -1641,5 +1641,12 @@ fn handle_texture_address(
 #[cfg(feature = "physx-diagnostics")]
 cuda_function_declarations! {
     nop,
-    implemented <= [cuModuleGetGlobal_v2, cuMemcpyDtoH_v2, cuTexObjectCreate, cuTexObjectDestroy]
+    implemented <= [cuModuleGetGlobal_v2, cuMemcpyDtoH_v2]
+}
+
+// Pool unit tests use the mock backend, so these imports are production-only.
+#[cfg(all(feature = "physx-diagnostics", not(test)))]
+cuda_function_declarations! {
+    nop,
+    implemented <= [cuTexObjectCreate, cuTexObjectDestroy]
 }
