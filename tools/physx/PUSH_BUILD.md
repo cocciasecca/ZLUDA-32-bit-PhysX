@@ -23,3 +23,25 @@ La ricerca di build esistenti copre gli ultimi 30 run del workflow per il commit
 ## Profilo predefinito dopo questa indagine
 
 Installa il server control con proxy della stessa revisione: cache degli intervalli ON, rinvio texture OFF, diagnostica OFF. Il guadagno FPS della cache non è dimostrato. Gli esperimenti restano nel codice, ma non sono attivati dall’installer normale. Backup e manifest usano il suffisso `-baseline`.
+
+## Confronto con la stessa build
+
+Profili: `baseline` = control e log OFF; `diagnostic` = server diagnostico, log ON, pre-sync OFF; `unbind-probe` = stesso server diagnostico, log ON e pre-sync ON. Cache intervalli ON, texture deferral OFF in tutti i profili. Il cambio profilo crea un backup distinto; log nuovo a ogni avvio. Ripetere un profilo dopo un altro preserva anche i backup precedenti.
+
+Prossima prova, Batman chiuso, senza ricompilare:
+
+```sh
+python3 tools/physx/push_build.py --install-run 39524047539 --profile diagnostic
+```
+
+Per le future modifiche al codice, push/build/install:
+
+```sh
+python3 tools/physx/push_build.py --yes --install --profile diagnostic
+```
+
+Confrontare stessa scena, impostazioni e riscaldamento; FPS da soli non bastano. Probe ON è una perturbazione, non un'ottimizzazione. Lasciare all'utente push/build/install come concordato.
+
+## Sonda global texture
+
+`--profile texture-global` attiva fino a otto letture di confronto host/device, con diagnostica ON e pre-sync OFF. Nessuna scrittura GPU o pool. Questa prova verifica accessibilità/layout, non gli FPS. Comando: `python3 tools/physx/push_build.py --yes --install --profile texture-global`.

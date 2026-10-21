@@ -19,3 +19,13 @@ Work on branch experiment/physx-diagnostics in /private/tmp/zluda-physx-diagnost
 Next investigation should target a different mechanism and use this simpler baseline. Do not repeat the no-texture-kernel deferral experiment without new evidence.
 
 Active branch cleanup: texture experiments moved to tag archive/physx-texture-deferral-2026-10-21. Three artifacts now: control, diagnostic, proxy. Optional pre-unbind synchronization probe prepared and locally tested; disabled by default, not deployed. See UNBIND_PROBE.md.
+
+Installed unbind probe: run39524047539 commit19714c9cd429bed6ccc49ea1dc9bd58373e9bfda, diagnostic server and matched proxy verified. SPLIT_UNBIND=1, range cache ON, reuse OFF; unique unbind-probe UUID CSV per launch. Backup update-backup-39524047539-unbind-probe. No running game modified; prefix preserved during install. Await same-scene launch and capture. Probe timers are nested: exclude from service totals. Need probe-OFF comparison before causal conclusions.
+
+Probe ON capture19714c9: user26–27FPS;46473 phase pairs reconcile with all unbind calls, zero errors. Pre-sync1.096s, subsequent unbind15.381s in25.001s. Dominant cost persists after explicit sync, not proof of pure deallocation. Probe-OFF comparison still missing. See measurements/unbind-probe-2026-10-21. No new deployment.
+
+User now owns push/build/install. Local-only script update: baseline/diagnostic/unbind-probe profiles and safe repeat switches with distinct backups. Five settings profile transitions tested, fresh log IDs verified. Next: user installs run39524047539 profile diagnostic (probe OFF), no new compilation needed. Existing flags/format setters already avoid refresh when unchanged; no new texture optimization justified yet. No push or remote mutation in this step.
+
+Probe OFF verified19714c9, profile diagnostic, user24–25FPS. Bound unbind659us vs ON692us, ~82% service remains unbind. Workload not equivalent:959 kernel launches/sec vs645, mostly changed bindings OFF vs identical ON. No causal FPS comparison. Evidence measurements/unbind-off-2026-10-21. Leave probe OFF; no remote writes.
+
+Local preparation: bounded native texture global probe, profile texture-global. Two local layout tests pass; Windows integration test added to CI. No push/build/install performed. Await user script and runtime observation. See TEXTURE_GLOBAL_PROBE.md. LRU/sequence recorder not yet implemented; first gate is global feasibility.

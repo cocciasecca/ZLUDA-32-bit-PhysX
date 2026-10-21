@@ -6,6 +6,8 @@ mod diagnostics;
 #[cfg(feature = "physx-diagnostics")]
 mod texture_diagnostics;
 #[cfg(feature = "physx-diagnostics")]
+mod texture_global_probe;
+#[cfg(feature = "physx-diagnostics")]
 mod unbind_probe;
 
 use cuda_macros::cuda_function_declarations;
@@ -29,6 +31,8 @@ use windows::Win32::System::Threading::*;
 use zluda_server_common::*;
 
 struct State {
+    #[cfg(feature = "physx-diagnostics")]
+    texture_global_probe: Option<texture_global_probe::Probe>,
     #[cfg(feature = "physx-diagnostics")]
     split_unbind: bool,
     #[cfg(feature = "physx-diagnostics")]
@@ -279,6 +283,8 @@ impl State {
         unsafe { cuCtxSetCurrent(ctx) }?;
         Ok(Self {
             #[cfg(feature = "physx-diagnostics")]
+            texture_global_probe: texture_global_probe::Probe::open(),
+            #[cfg(feature = "physx-diagnostics")]
             split_unbind: std::env::var("ZLUDA_PHYSX_SPLIT_UNBIND").as_deref() == Ok("1"),
             #[cfg(feature = "physx-diagnostics")]
             texture_history: texture_diagnostics::TextureHistory::default(),
@@ -468,12 +474,7 @@ fn main() -> std::io::Result<()> {
                 };
                 #[cfg(not(feature = "physx-diagnostics"))]
                 let name = std::any::type_name::<cuTexRefSetAddress_v2In>();
-                handle_cuda_function_named::<cuTexRefSetAddress_v2In, cuTexRefSetAddress_v2Out>(
-                    &mut local,
-                    &mut remote,
-                    |input| cu_tex_ref_set_address_v2(&mut state, input),
-                    name,
-                );
+                handle_texture_address(&mut local, &mut remote, &mut state, name);
             }
             Some(Opcode::cuTexRefSetFlags) => {
                 handle_cuda_function::<cuTexRefSetFlagsIn, cuTexRefSetFlagsOut>(
@@ -1402,11 +1403,12 @@ cuda_function_declarations! {
         cuMemcpyDtoD_v2,
         cuMemcpyDtoDAsync_v2,
         cuMemcpyDtoHAsync_v2,
+
         cuMemcpyHtoD_v2,
         cuMemcpyHtoDAsync_v2,
         cuMemsetD8_v2,
         cuModuleGetFunction,
-        // cuModuleGetGlobal_v2,
+        // cuModuleGetGlobal_v2 (diagnostic probe only),
         cuModuleGetTexRef,
         cuModuleLoadData,
         cuModuleUnload,
@@ -1426,4 +1428,55 @@ cuda_function_declarations! {
         cuDevicePrimaryCtxRetain,
         cuCtxSetCurrent,
     ]
+}
+
+fn handle_texture_address(
+    local: &mut Endpoint,
+    remote: &mut Endpoint,
+    state: &mut State,
+    name: &'static str,
+) {
+    #[cfg(feature = "physx-diagnostics")]
+    let timer = diagnostics::Timer::start(name);
+    #[cfg(not(feature = "physx-diagnostics"))]
+    let _ = name;
+    let input: ArchivedcuTexRefSetAddress_v2In = local.shared_memory.read_body();
+    let result = cu_tex_ref_set_address_v2(state, &input);
+    match &result {
+        Ok(output) => {
+            remote.shared_memory.write_header(0);
+            remote.shared_memory.write_body(output);
+        }
+        Err(error) => remote.shared_memory.write_header(error.0.get()),
+    }
+    #[cfg(feature = "physx-diagnostics")]
+    {
+        timer.finish(remote.shared_memory.read_header());
+        if result.is_ok() && input.dptr.to_native() != 0 {
+            let handle = input.hTexRef.to_native();
+            if let Some(probe) = state
+                .texture_global_probe
+                .as_mut()
+                .filter(|p| p.wants(handle))
+            {
+                if let Ok(host) = state.handles.get::<CUtexref_st>(handle) {
+                    for (module, data) in &state.modules.modules {
+                        if let Some((symbol, _)) =
+                            data.texrefs.iter().find(|(_, id)| **id == handle)
+                        {
+                            probe.observe(handle, *module, symbol, host.cast());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
+}
+
+#[cfg(feature = "physx-diagnostics")]
+cuda_function_declarations! {
+    nop,
+    implemented <= [cuModuleGetGlobal_v2, cuMemcpyDtoH_v2]
 }

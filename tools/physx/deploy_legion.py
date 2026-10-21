@@ -17,7 +17,9 @@ def run(*args):
     return subprocess.check_output(args, text=True)
 
 
-def deploy(run_id, host='deck@192.168.10.67', key=None):
+def deploy(run_id, host='deck@192.168.10.67', key=None, profile='baseline'):
+    if profile not in ('baseline', 'diagnostic', 'unbind-probe', 'texture-global'):
+        raise RuntimeError('Profilo non valido')
     run_id = str(run_id)
     if not run_id.isdecimal() or not re.fullmatch(r'[A-Za-z0-9_.-]+@[A-Za-z0-9.-]+', host):
         raise RuntimeError('Run o host non valido')
@@ -57,7 +59,7 @@ def deploy(run_id, host='deck@192.168.10.67', key=None):
         if not re.fullmatch(r'/home/deck/zluda-install-[A-Za-z0-9]+', remote):
             raise RuntimeError('Directory remota inattesa')
         subprocess.run(['scp', *options, '-r', str(payload), str(Path(__file__).with_name('legion_install.py')), f'{host}:{remote}/'], check=True)
-        print(run('ssh', *options, host, 'python3 '+shlex.quote(remote+'/legion_install.py')+' '+run_id+' '+shlex.quote(sha)))
+        print(run('ssh', *options, host, 'python3 '+shlex.quote(remote+'/legion_install.py')+' '+run_id+' '+shlex.quote(sha)+' '+shlex.quote(profile)))
         print('Legion aggiornata. Backup nella copia sperimentale; puoi avviare Batman.')
 
 
@@ -67,5 +69,6 @@ if __name__ == '__main__':
     parser.add_argument('run_id')
     parser.add_argument('--host', default='deck@192.168.10.67')
     parser.add_argument('--key')
+    parser.add_argument('--profile', choices=['baseline','diagnostic','unbind-probe','texture-global'], default='baseline')
     args = parser.parse_args()
-    deploy(args.run_id, args.host, args.key)
+    deploy(args.run_id, args.host, args.key, args.profile)

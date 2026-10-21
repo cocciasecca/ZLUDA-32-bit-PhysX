@@ -27,12 +27,13 @@ def main():
     parser.add_argument('--install-run', help='Install an existing run without commit, push or build')
     parser.add_argument('--host', default='deck@192.168.10.67')
     parser.add_argument('--key', help='SSH key path')
+    parser.add_argument('--profile', choices=['baseline','diagnostic','unbind-probe','texture-global'], default='baseline', help='diagnostic: log ON/probe OFF; unbind-probe: log ON/probe ON')
     args = parser.parse_args()
     if args.no_wait and (args.install or args.install_run):
         parser.error('--no-wait non è compatibile con installazione')
     if args.install_run:
         from deploy_legion import deploy
-        deploy(args.install_run, args.host, args.key)
+        deploy(args.install_run, args.host, args.key, args.profile)
         return
     for tool in ('git', 'gh'):
         if not shutil.which(tool):
@@ -91,7 +92,7 @@ def main():
         print('Build riuscita. I binari sono negli artifact del link sopra.')
     if args.install:
         from deploy_legion import deploy
-        deploy(run_id, args.host, args.key)
+        deploy(run_id, args.host, args.key, args.profile)
 
 
 if __name__ == '__main__':

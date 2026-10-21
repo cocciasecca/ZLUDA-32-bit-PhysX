@@ -2,6 +2,10 @@ import sys
 from pathlib import Path
 import hashlib,json,shutil,subprocess,os
 run_id=sys.argv[1];commit=sys.argv[2]
+profile=sys.argv[3] if len(sys.argv)>3 else 'baseline'
+assert profile in ('baseline','diagnostic','unbind-probe','texture-global')
+diagnostic=profile!='baseline'
+probe=profile=='unbind-probe'
 assert run_id.isdecimal() and len(commit)==40 and all(c in '0123456789abcdef' for c in commit)
 root=Path('/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment')
 original=root.parent/'ZludaProton'
@@ -17,22 +21,24 @@ for row in (payload/'SHA256SUMS.txt').read_text(encoding='utf-8-sig').splitlines
  h,n=row.split(None,1);assert sha(payload/n.replace('\\','/'))==h
 prefix=Path('/home/deck/.local/share/Steam/steamapps/compatdata/35140/pfx')
 prefix_before={rel:sha(prefix/rel) for rel in ['drive_c/windows/syswow64/nvcuda.dll','drive_c/windows/system32/nvcuda.dll']}
-record_path=root/f'update-manifest-{run_id}-baseline.json'
+record_path=root/f'update-manifest-{run_id}-{profile}.json'
 if record_path.exists():
  previous=json.loads(record_path.read_text())
- assert previous['commit']==commit
- assert sha(root/'user_settings.py')==previous['settings_sha256'],'Settings changed since installation'
- assert all(sha(root/rel)==h for rel,h in previous['files'].items()),'Installed files differ from manifest'
- print('Already installed and verified');sys.exit(0)
-backup=root/f'update-backup-{run_id}-baseline'
+ if previous['commit']==commit and sha(root/'user_settings.py')==previous['settings_sha256'] and all(sha(root/rel)==h for rel,h in previous['files'].items()):
+  print('Already installed and verified');sys.exit(0)
+backup=root/f'update-backup-{run_id}-{profile}'
+if backup.exists():
+ import uuid
+ backup=backup.with_name(backup.name+'-'+uuid.uuid4().hex)
 backup.mkdir()
-pairs=[('control/zluda64_server.exe','zluda/zluda64_server.exe'),('32/nvcuda.dll','zluda/32/nvcuda.dll'),('32/nvcuda.dll','files/share/default_pfx/drive_c/windows/syswow64/nvcuda.dll'),('control/zluda64_server.exe','diagnostic-control/zluda64_server.exe'),('README.txt','diagnostic-control/README.txt'),('SHA256SUMS.txt','diagnostic-control/SHA256SUMS.txt')]
+if record_path.exists():shutil.copy2(record_path,backup/"previous-install-manifest.json")
+pairs=[(('diagnostic' if diagnostic else 'control')+'/zluda64_server.exe','zluda/zluda64_server.exe'),('32/nvcuda.dll','zluda/32/nvcuda.dll'),('32/nvcuda.dll','files/share/default_pfx/drive_c/windows/syswow64/nvcuda.dll'),('control/zluda64_server.exe','diagnostic-control/zluda64_server.exe'),('README.txt','diagnostic-control/README.txt'),('SHA256SUMS.txt','diagnostic-control/SHA256SUMS.txt')]
 staged=[]
 for src,rel in pairs:
  target=root/rel
  assert target.resolve().is_relative_to(root.resolve())
  saved=backup/rel;saved.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(target,saved)
- temp=target.with_name(target.name+f'.pending-{run_id}')
+ temp=target.with_name(target.name+f'.pending-{run_id}-{profile}')
  assert not temp.exists()
  shutil.copy2(payload/src,temp)
  assert sha(temp)==sha(payload/src)
@@ -41,17 +47,20 @@ settings=root/'user_settings.py'
 saved_settings=backup/'user_settings.py'
 shutil.copy2(settings,saved_settings)
 new_settings=settings.read_text()+f'''
-# Baseline after texture-reuse investigation, run {run_id}.
+# Profile {profile}, run {run_id}.
 user_settings["ZLUDA_PHYSX_TEXTURE_REUSE"] = "0"
 user_settings["ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS"] = "0"
 user_settings["ZLUDA_PHYSX_RANGE_CACHE"] = "1"
-user_settings["ZLUDA_PHYSX_SPLIT_UNBIND"] = "0"
+user_settings["ZLUDA_PHYSX_SPLIT_UNBIND"] = "{int(probe)}"
+user_settings["ZLUDA_PHYSX_TEXTURE_GLOBAL_PROBE"] = "{int(profile=='texture-global')}"
 user_settings.pop("ZLUDA_PHYSX_DIAGNOSTICS", None)
 import os as _zluda_environment
 _zluda_environment.environ.pop("ZLUDA_PHYSX_DIAGNOSTICS", None)
 '''
+if diagnostic:
+ new_settings += '\nimport uuid as _zluda_log_uuid\nuser_settings["ZLUDA_PHYSX_DIAGNOSTICS"] = "Z:/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/diagnostics/' + profile + '-" + _zluda_log_uuid.uuid4().hex + ".csv"\n'
 compile(new_settings,str(settings),'exec')
-temp_settings=settings.with_name(f'user_settings.py.pending-{run_id}')
+temp_settings=settings.with_name(f'user_settings.py.pending-{run_id}-{profile}')
 temp_settings.write_text(new_settings)
 staged.append((temp_settings,settings,saved_settings))
 assert subprocess.run(['pgrep','-f','[z]luda64_server|[S]hippingPC-BmGame'],capture_output=True).returncode==1,'Game started during staging'
@@ -65,6 +74,6 @@ except Exception:
  raise
 assert all(sha(prefix/rel)==h for rel,h in prefix_before.items())
 assert sha(root/'zluda-libs/libamd_comgr.so.3')==sha(original/'zluda-libs/libamd_comgr.so.3')
-record={'run':int(run_id),'commit':commit,'files':{rel:sha(root/rel) for _,rel in pairs},'prefix_unchanged':prefix_before,'previous_payload_backup':str(backup),'csv_suffix':'.pid-N.csv','profile':'range-cache-baseline','diagnostics_enabled':False,'texture_reuse_enabled':False,'texture_reuse_transfers':False,'range_cache_enabled':True,'settings_sha256':sha(settings)}
+record={'run':int(run_id),'commit':commit,'files':{rel:sha(root/rel) for _,rel in pairs},'prefix_unchanged':prefix_before,'previous_payload_backup':str(backup),'csv_suffix':'.pid-N.csv','profile':profile,'diagnostics_enabled':diagnostic,'split_unbind_enabled':probe,'texture_reuse_enabled':False,'texture_reuse_transfers':False,'range_cache_enabled':True,'settings_sha256':sha(settings)}
 record_path.write_text(json.dumps(record,indent=2)+'\n')
 print(json.dumps(record,indent=2))
