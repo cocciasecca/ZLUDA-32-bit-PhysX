@@ -100,8 +100,6 @@ impl ModuleLaunchData {
         unsafe { cuGetExportTable(&mut zluda32_ptr, &dark_api::zluda32::Zluda32Internal::GUID) }?;
         let zluda32 = unsafe { dark_api::zluda32::Zluda32Internal::new(zluda32_ptr) };
         Ok(Self {
-            #[cfg(feature = "physx-diagnostics")]
-            pool_capture: pool_capture::Capture::open(),
             dark_api: zluda32,
             modules: FxHashMap::default(),
             functions: FxHashMap::default(),
@@ -288,6 +286,8 @@ impl State {
         unsafe { cuDevicePrimaryCtxRetain(&mut ctx, device) }?;
         unsafe { cuCtxSetCurrent(ctx) }?;
         Ok(Self {
+            #[cfg(feature = "physx-diagnostics")]
+            pool_capture: pool_capture::Capture::open(),
             #[cfg(feature = "physx-diagnostics")]
             texture_global_probe: texture_global_probe::Probe::open(),
             #[cfg(feature = "physx-diagnostics")]
