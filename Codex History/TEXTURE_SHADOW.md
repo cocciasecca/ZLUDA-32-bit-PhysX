@@ -1,3 +1,5 @@
+> Updated local model and verification: see [SHADOW_LOCAL_VERIFICATION.md](SHADOW_LOCAL_VERIFICATION.md). The description below records the first diagnostic implementation and its limitations.
+
 # Counterfactual texture reuse measurement
 
 The reuse server now maintains a separate bounded (64-handle) model. Actual barriers, synchronization and HIP operations are unchanged. A successful bind followed by unbind remains pending in the model across kernels classified NoTextureInstructions and permitted transfers/synchronization. A later successful identical pointer/size bind records `shadow/same_binding_after_candidate`; a different binding records `shadow/changed_binding_after_candidate`.

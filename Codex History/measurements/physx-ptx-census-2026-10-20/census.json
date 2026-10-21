@@ -1,0 +1,168 @@
+{
+  "dll_sha256": "df8d6bf07d024b8dce846a4bfcc5fdf4c42afc5e67acd43afb66cf28bfffff88",
+  "method": "Offline lexical census, comments removed; not an AST safety proof or runtime kernel identity trace. No vendor PTX included.",
+  "modules": [
+    {
+      "file": "341000-3b4da0.ptx",
+      "sha256": "c124835a59284d5a772e40937a8d1acf3df2b965618631975ba8e8479a2d73b6",
+      "entries": 42,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "3dd0d8-3e74e8.ptx",
+      "sha256": "b6e71be4655715b5fe41e2b3fa577bdc0385cd278a8eec8dc35f8d522dcf656b",
+      "entries": 4,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "3eb270-3ef9f0.ptx",
+      "sha256": "b77bc0ca09397b060a07c73ee68b8e56f2ef7202d78b784e899138efd603d758",
+      "entries": 1,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "3f1988-401240.ptx",
+      "sha256": "f53b6418ca3f3e2a25b342b934b654cff497a4137120f4034dd81614ddd09289",
+      "entries": 1,
+      "texture_declarations": 4,
+      "texture_instructions": 32,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "4066d0-417188.ptx",
+      "sha256": "ce72dad51e4d4aaa52e27358380061727086d1515851573e4020357b0580f240",
+      "entries": 1,
+      "texture_declarations": 6,
+      "texture_instructions": 36,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "41d498-41e108.ptx",
+      "sha256": "3b86db3e6567ceccd6fd6924597d626bdcd85de5a3d31a4811d69b05a9394cba",
+      "entries": 0,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "41e650-4275c0.ptx",
+      "sha256": "e95e5a7b0dad9dda1333d4b38f8c4d47f21a86bccbd30fba6dd1687d2ee6e6c4",
+      "entries": 1,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "42be60-430d80.ptx",
+      "sha256": "fa4c757f15ea3917898033734d86383f1cb0f7cbd79bf003889b7343b7e8f975",
+      "entries": 1,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "4331c0-4387d0.ptx",
+      "sha256": "d200ad53fdde7aa285fca6e61dcce9e02795f4cb0dbe510d2b0b887569df4ba0",
+      "entries": 1,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "43b100-448c60.ptx",
+      "sha256": "367ab76f4fd1227c53d35ff4c7c56c5a866c357b5a6d609c6a20bf1a3ff0cddb",
+      "entries": 1,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "44f7b8-45c738.ptx",
+      "sha256": "ba96e1ba4c116751934e6094e480db12b2d91f85b403df96cea34c52bb7b3830",
+      "entries": 1,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "462b90-46ffd0.ptx",
+      "sha256": "d22ddaeba42603e7f0f53a1efef871735001523262e8eefa7ca6e2dc2e291a42",
+      "entries": 1,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "476f70-484eb0.ptx",
+      "sha256": "cb743b03f8e663ef3227e04e216b36b85e3b3729e04048782f3ecb286917f998",
+      "entries": 1,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "48bcf0-4981d0.ptx",
+      "sha256": "0ad47733ea9dbdde27f2760069b8303c456ac0ac305824ab8639c8755e86b1d7",
+      "entries": 1,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "49ee08-4bf088.ptx",
+      "sha256": "48f81c2b5ad7da5b8a86a988744df9e7a45d4f1616fcf15e7aa4ac1b595575d7",
+      "entries": 10,
+      "texture_declarations": 7,
+      "texture_instructions": 48,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "4cb268-4f49a8.ptx",
+      "sha256": "ec661bd38b47ae8e6ffdec7fdcaa02a8ea122455e970e738d33f94aaa093aa4f",
+      "entries": 1,
+      "texture_declarations": 17,
+      "texture_instructions": 49,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "515d88-520470.ptx",
+      "sha256": "36624e3ea48fc608757992c7a622386d77b15fa6999593615ff7ab14b66ee03a",
+      "entries": 1,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    },
+    {
+      "file": "523cb8-555838.ptx",
+      "sha256": "ae9babfc0020cb798e449e43c39df71f1148ee7a0417a02352bba917fa13ce10",
+      "entries": 7,
+      "texture_declarations": 0,
+      "texture_instructions": 0,
+      "call_instructions": 0,
+      "texture_symbol_uses_outside_declarations_and_tex": []
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "seconds": 25.0098216,
+  "windows": 5,
+  "service_seconds": 19.6059112,
+  "user_fps": "26",
+  "rows": {
+    "texture_reuse/drain_before_kernel/no_texture_instructions": {
+      "calls": 1268,
+      "errors": 0,
+      "total_ns": 10217514300
+    },
+    "texture_reuse/drain_before_kernel/texture_instructions": {
+      "calls": 1268,
+      "errors": 0,
+      "total_ns": 4301490900
+    },
+    "texture_address/bind_changed_address_size": {
+      "calls": 21556,
+      "errors": 0,
+      "total_ns": 2564309900
+    },
+    "texture_address/unbind_bound": {
+      "calls": 25994,
+      "errors": 0,
+      "total_ns": 825551900
+    },
+    "zluda_server_common::cuMemcpyDtoHAsync_v2In": {
+      "calls": 3804,
+      "errors": 0,
+      "total_ns": 675853700
+    },
+    "texture_address/bind_same_after_unbind": {
+      "calls": 4438,
+      "errors": 0,
+      "total_ns": 563726900
+    },
+    "zluda_server_common::cuMemcpyHtoDAsync_v2In": {
+      "calls": 25994,
+      "errors": 0,
+      "total_ns": 193252600
+    },
+    "zluda_server_common::cuLaunchKernelIn": {
+      "calls": 25360,
+      "errors": 0,
+      "total_ns": 157727800
+    },
+    "zluda_server_common::cuMemsetD8_v2In": {
+      "calls": 1268,
+      "errors": 0,
+      "total_ns": 68009300
+    },
+    "texture_address/unbind_already_unbound": {
+      "calls": 25994,
+      "errors": 0,
+      "total_ns": 17441200
+    },
+    "zluda_server_common::cuTexRefSetFormatIn": {
+      "calls": 25994,
+      "errors": 0,
+      "total_ns": 11980900
+    },
+    "zluda_server_common::cuTexRefSetFlagsIn": {
+      "calls": 25994,
+      "errors": 0,
+      "total_ns": 7764900
+    },
+    "zluda_server_common::cuCtxSynchronizeIn": {
+      "calls": 1902,
+      "errors": 0,
+      "total_ns": 1286900
+    }
+  }
+}

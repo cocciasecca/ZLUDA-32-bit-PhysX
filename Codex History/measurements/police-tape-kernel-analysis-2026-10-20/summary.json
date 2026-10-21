@@ -1,0 +1,79 @@
+{
+  "user_fps": "24\u201325",
+  "header": [
+    "# pid=588,unix_ns=1792516331203737400,git=43a1290e4324bcc27b1ce81f25a96134dfcdeb93",
+    "# texture_reuse_feature=true,texture_reuse_enabled=true",
+    "# texture_reuse_transfers_requested=true",
+    "window_start_ns,window_end_ns,request,calls,errors,total_ns,max_ns"
+  ],
+  "seconds": 25.0092956,
+  "windows": 5,
+  "service_seconds": 19.1648244,
+  "cache_delta": {
+    "queries": 24576,
+    "hits": 24576,
+    "misses": 0
+  },
+  "apis": {
+    "texture_address/bind_same_after_unbind": [
+      22194,
+      0,
+      2996454500
+    ],
+    "texture_address/unbind_already_unbound": [
+      22194,
+      0,
+      15428500
+    ],
+    "texture_address/unbind_bound": [
+      22194,
+      0,
+      589468100
+    ],
+    "texture_reuse/drain_before_kernel/no_texture_instructions": [
+      1233,
+      0,
+      9651282000
+    ],
+    "texture_reuse/drain_before_kernel/texture_instructions": [
+      1233,
+      0,
+      4969239300
+    ],
+    "zluda_server_common::cuCtxSynchronizeIn": [
+      1851,
+      0,
+      1465500
+    ],
+    "zluda_server_common::cuLaunchKernelIn": [
+      15417,
+      0,
+      128394300
+    ],
+    "zluda_server_common::cuMemcpyDtoHAsync_v2In": [
+      3702,
+      0,
+      522436000
+    ],
+    "zluda_server_common::cuMemcpyHtoDAsync_v2In": [
+      24049,
+      0,
+      202349900
+    ],
+    "zluda_server_common::cuMemsetD8_v2In": [
+      1233,
+      0,
+      68330600
+    ],
+    "zluda_server_common::cuTexRefSetFlagsIn": [
+      22194,
+      0,
+      7782700
+    ],
+    "zluda_server_common::cuTexRefSetFormatIn": [
+      22194,
+      0,
+      12193000
+    ]
+  }
+}
