@@ -10,6 +10,8 @@ mod texture_diagnostics;
 #[cfg(feature = "physx-diagnostics")]
 mod texture_global_probe;
 #[cfg(feature = "physx-diagnostics")]
+mod texture_pool;
+#[cfg(feature = "physx-diagnostics")]
 mod unbind_probe;
 
 use cuda_macros::cuda_function_declarations;
@@ -33,6 +35,8 @@ use windows::Win32::System::Threading::*;
 use zluda_server_common::*;
 
 struct State {
+    #[cfg(feature = "physx-diagnostics")]
+    texture_pool: Option<texture_pool::Pool>,
     #[cfg(feature = "physx-diagnostics")]
     pool_capture: Option<pool_capture::Capture>,
     #[cfg(feature = "physx-diagnostics")]
@@ -287,6 +291,9 @@ impl State {
         unsafe { cuCtxSetCurrent(ctx) }?;
         Ok(Self {
             #[cfg(feature = "physx-diagnostics")]
+            texture_pool: (std::env::var("ZLUDA_PHYSX_TEXTURE_POOL").as_deref() == Ok("1"))
+                .then(texture_pool::Pool::default),
+            #[cfg(feature = "physx-diagnostics")]
             pool_capture: pool_capture::Capture::open(),
             #[cfg(feature = "physx-diagnostics")]
             texture_global_probe: texture_global_probe::Probe::open(),
@@ -394,6 +401,34 @@ fn main() -> std::io::Result<()> {
                 ) => Some(Event::Other(opcode)),
                 _ => Some(Event::Reset),
             };
+        }
+        #[cfg(feature = "physx-diagnostics")]
+        if remote.shared_memory.read_header() != 0
+            || !matches!(
+                Opcode::from_repr(opcode),
+                Some(
+                    Opcode::cuTexRefSetAddress_v2
+                        | Opcode::cuTexRefSetFlags
+                        | Opcode::cuTexRefSetFormat
+                        | Opcode::cuLaunchKernel
+                        | Opcode::cuCtxSynchronize
+                        | Opcode::cuMemGetAddressRange_v2
+                        | Opcode::cuMemcpyHtoD_v2
+                        | Opcode::cuMemcpyHtoDAsync_v2
+                        | Opcode::cuMemcpyDtoHAsync_v2
+                        | Opcode::cuMemcpyDtoD_v2
+                        | Opcode::cuMemcpyDtoDAsync_v2
+                        | Opcode::cuMemsetD8_v2
+                )
+            )
+        {
+            if let Some(pool) = state.texture_pool.as_mut() {
+                if let Err(error) = pool.drain() {
+                    remote.shared_memory.write_header(error.0.get());
+                    unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
+                    continue;
+                }
+            }
         }
         match Opcode::from_repr(opcode) {
             Some(Opcode::cuInit) => {
@@ -945,6 +980,10 @@ fn cu_tex_ref_set_format(
             input.NumPackedComponents.to_native(),
         )
     }?;
+    #[cfg(feature = "physx-diagnostics")]
+    if let Some(pool) = state.texture_pool.as_mut() {
+        pool.configuration_changed(input.hTexRef.to_native())?;
+    }
     Ok(cuTexRefSetFormatOut {})
 }
 
@@ -954,6 +993,10 @@ fn cu_tex_ref_set_flags(
 ) -> Result<cuTexRefSetFlagsOut, CUerror> {
     let tex_ref = state.handles.get(input.hTexRef.to_native())?;
     unsafe { cuTexRefSetFlags(tex_ref, input.Flags.to_native()) }?;
+    #[cfg(feature = "physx-diagnostics")]
+    if let Some(pool) = state.texture_pool.as_mut() {
+        pool.configuration_changed(input.hTexRef.to_native())?;
+    }
     Ok(cuTexRefSetFlagsOut {})
 }
 
@@ -965,6 +1008,51 @@ fn cu_tex_ref_set_address_v2(
     let dptr = input.dptr.to_native();
     let dptr = CUdeviceptr_v2(state.devmemory.translate(dptr)?);
     let handle = state.handles.get(input.hTexRef.to_native())?;
+    #[cfg(feature = "physx-diagnostics")]
+    if state.texture_pool.is_some() {
+        let id = input.hTexRef.to_native();
+        let mut global = None;
+        if input.dptr.to_native() != 0 {
+            for (module, data) in &state.modules.modules {
+                if let Some((symbol, _)) = data.texrefs.iter().find(|(_, h)| **h == id) {
+                    let symbol = symbol.strip_suffix(&[0]).unwrap_or(symbol);
+                    if let Ok(name) = std::ffi::CString::new(symbol) {
+                        let mut address = CUdeviceptr_v2(std::ptr::null_mut());
+                        let mut size = 0;
+                        if unsafe {
+                            cuModuleGetGlobal_v2(&mut address, &mut size, *module, name.as_ptr())
+                        }
+                        .is_ok()
+                            && size == 88
+                        {
+                            global = Some(address.0 as usize);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        let pool = state.texture_pool.as_mut().unwrap();
+        let before = (pool.hits, pool.misses, pool.fallbacks);
+        let result = pool.address(
+            id,
+            handle as usize,
+            global,
+            dptr.0 as usize,
+            input.bytes.to_native() as usize,
+        )?;
+        diagnostics::count("pool/hit", (pool.hits - before.0) as usize);
+        diagnostics::count("pool/miss", (pool.misses - before.1) as usize);
+        diagnostics::count("pool/fallback", (pool.fallbacks - before.2) as usize);
+        if let Some(offset) = result {
+            state
+                .texture_history
+                .succeeded(id, input.dptr.to_native(), input.bytes.to_native());
+            return Ok(cuTexRefSetAddress_v2Out {
+                ByteOffset: (offset as u32).into(),
+            });
+        }
+    }
     let mut native = || unsafe {
         cuTexRefSetAddress_v2(
             &mut byte_offset,
@@ -1553,5 +1641,5 @@ fn handle_texture_address(
 #[cfg(feature = "physx-diagnostics")]
 cuda_function_declarations! {
     nop,
-    implemented <= [cuModuleGetGlobal_v2, cuMemcpyDtoH_v2]
+    implemented <= [cuModuleGetGlobal_v2, cuMemcpyDtoH_v2, cuTexObjectCreate, cuTexObjectDestroy]
 }

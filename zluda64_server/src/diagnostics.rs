@@ -152,3 +152,9 @@ mod tests {
         std::fs::remove_file(path).unwrap();
     }
 }
+
+// Count-only rows: do not add to API request totals.
+pub fn count(name: &'static str, count: usize) {
+    if count == 0 { return; }
+    RECORDER.with(|r| {if let Some(r)=r.borrow_mut().as_mut() {r.stats.entry(name).or_default().calls += count as u64;}});
+}

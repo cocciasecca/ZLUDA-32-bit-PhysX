@@ -49,3 +49,7 @@ Confrontare stessa scena, impostazioni e riscaldamento; FPS da soli non bastano.
 ## Raccolta unica per il pool
 
 `python3 tools/physx/push_build.py --yes --install --profile pool-capture` prepara la raccolta unica. Dopo l’avvio attendi nella scena e scrivi «ci sono»: la cattura viene armata tramite il file `diagnostics/pool-capture.start` sulla Legion, senza ricompilare. Durata60secondi, log LRU e sequenza limitati; non attiva un pool né modifica le chiamate GPU.
+
+## Prototipo pool reale
+
+`python3 tools/physx/push_build.py --yes --install --profile texture-pool` attiva il pool sperimentale64elementi; le sonde e la simulazione sono spente. Verifica effetti PhysX e contatori prima di attribuire variazioni FPS. `--install-run RUN --profile diagnostic` usa la stessa build con pool spento.

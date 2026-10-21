@@ -233,6 +233,11 @@ jobs:
         run: |
           cargo test --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-diagnostics pool_capture::
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test texture pool ownership and fallback
+        shell: pwsh
+        run: |
+          cargo test --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-diagnostics texture_pool::
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build control and diagnostic servers
         shell: pwsh
         run: |

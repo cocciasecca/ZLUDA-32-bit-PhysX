@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--install-run', help='Install an existing run without commit, push or build')
     parser.add_argument('--host', default='deck@192.168.10.67')
     parser.add_argument('--key', help='SSH key path')
-    parser.add_argument('--profile', choices=['baseline','diagnostic','unbind-probe','texture-global', 'pool-capture'], default='baseline', help='diagnostic: log ON/probe OFF; unbind-probe: log ON/probe ON')
+    parser.add_argument('--profile', choices=['baseline','diagnostic','unbind-probe','texture-global', 'pool-capture', 'texture-pool'], default='baseline', help='diagnostic: log ON/probe OFF; unbind-probe: log ON/probe ON')
     args = parser.parse_args()
     if args.no_wait and (args.install or args.install_run):
         parser.error('--no-wait non è compatibile con installazione')

@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib,json,shutil,subprocess,os
 run_id=sys.argv[1];commit=sys.argv[2]
 profile=sys.argv[3] if len(sys.argv)>3 else 'baseline'
-assert profile in ('baseline','diagnostic','unbind-probe','texture-global','pool-capture')
+assert profile in ('baseline','diagnostic','unbind-probe','texture-global','pool-capture','texture-pool')
 diagnostic=profile!='baseline'
 probe=profile=='unbind-probe'
 assert run_id.isdecimal() and len(commit)==40 and all(c in '0123456789abcdef' for c in commit)
@@ -54,6 +54,7 @@ user_settings["ZLUDA_PHYSX_RANGE_CACHE"] = "1"
 user_settings["ZLUDA_PHYSX_SPLIT_UNBIND"] = "{int(probe)}"
 user_settings["ZLUDA_PHYSX_TEXTURE_GLOBAL_PROBE"] = "{int(profile in ('texture-global','pool-capture'))}"
 user_settings["ZLUDA_PHYSX_POOL_CAPTURE"] = "{int(profile=='pool-capture')}"
+user_settings["ZLUDA_PHYSX_TEXTURE_POOL"] = "{int(profile=='texture-pool')}"
 user_settings.pop("ZLUDA_PHYSX_DIAGNOSTICS", None)
 import os as _zluda_environment
 _zluda_environment.environ.pop("ZLUDA_PHYSX_DIAGNOSTICS", None)
