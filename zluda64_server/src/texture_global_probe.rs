@@ -59,7 +59,7 @@ impl Probe {
         let symbol = symbol.strip_suffix(&[0]).unwrap_or(symbol);
         let symbol_hex: String = symbol.iter().map(|b| format!("{b:02x}")).collect();
         let mut bytes = 0usize;
-        let mut address = super::CUdeviceptr_v2(0);
+        let mut address = super::CUdeviceptr_v2(std::ptr::null_mut());
         let mut host_bytes = [0u8; EXPECTED_SIZE];
         let mut device_bytes = [0u8; EXPECTED_SIZE];
         let status = (|| -> String {
