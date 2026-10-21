@@ -11,6 +11,7 @@ struct Key {
 }
 #[derive(Clone)]
 struct Binding {
+    bound: bool,
     global: usize,
     host: usize,
     pointer: usize,
@@ -127,7 +128,12 @@ mod native {
             for h in handles {
                 let b = self.active.get(&h).unwrap().clone();
                 // Native host copy is null, so it cannot destroy the pool object.
-                bind_native(b.host, b.pointer, b.bytes)?;
+                if b.bound {
+                    bind_native(b.host, b.pointer, b.bytes)?;
+                } else {
+                    // Retained device references must be cleared before their objects die.
+                    write(b.global, &b.key.config, 0)?;
+                }
                 self.active.remove(&h);
             }
             self.validated.clear();
@@ -139,7 +145,7 @@ mod native {
             Ok(())
         }
         pub fn configuration_changed(&mut self, h: u32) -> Result<(), CUerror> {
-            if let Some(b) = self.active.get(&h).cloned() {
+            if let Some(b) = self.active.get(&h).filter(|b| b.bound).cloned() {
                 if let Some(mut c) = read(b.host) {
                     c[OBJECT..OBJECT + 8].fill(0);
                     if c == b.key.config {
@@ -169,10 +175,10 @@ mod native {
                 return Ok(None);
             }
             if pointer == 0 {
-                if let Some(b) = self.active.get(&h).cloned() {
-                    unsafe { cuCtxSynchronize() }?;
-                    write(b.global, &b.key.config, 0)?;
-                    self.active.remove(&h);
+                if let Some(b) = self.active.get_mut(&h) {
+                    // Native unbind leaves the device descriptor unchanged. Keep its
+                    // pooled object alive; setters must now treat this texref as unbound.
+                    b.bound = false;
                     return Ok(Some(0));
                 }
                 return Ok(None);
@@ -207,6 +213,7 @@ mod native {
                 self.active.insert(
                     h,
                     Binding {
+                        bound: true,
                         global,
                         host,
                         pointer,
@@ -275,6 +282,7 @@ mod native {
             self.active.insert(
                 h,
                 Binding {
+                    bound: true,
                     global,
                     host,
                     pointer,
@@ -514,11 +522,13 @@ mod ownership_tests {
             assert_eq!(object(&h), 0);
             assert_ne!(object(&d), 0);
             p.address(1, h.as_ptr() as usize, None, 0, 0).unwrap();
-            assert_eq!(object(&d), 0);
+            assert_ne!(object(&d), 0);
+            assert!(!p.active[&1].bound);
         }
         assert_eq!(p.hits, 99);
         assert_eq!(p.objects.len(), 1);
         p.drain().unwrap();
+        assert_eq!(object(&d), 0);
         assert!(STATE.with(|s| s.borrow().objects.is_empty()));
     }
     #[test]
@@ -551,6 +561,34 @@ mod ownership_tests {
         p.configuration_changed(1).unwrap();
         assert_ne!(first, object(&d));
         assert_eq!(object(&h), 0);
+        p.drain().unwrap();
+    }
+    #[test]
+    fn setter_after_unbind_waits_for_next_bind() {
+        setup();
+        let (mut h, d) = fixture();
+        let mut p = Pool::default();
+        p.address(1, h.as_ptr() as usize, Some(d.as_ptr() as usize), 256, 64)
+            .unwrap();
+        let first = object(&d);
+        p.address(1, h.as_ptr() as usize, None, 0, 0).unwrap();
+        h[4] = 1;
+        STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            s.fail_write = true;
+            s.fail_sync = true;
+        });
+        p.configuration_changed(1).unwrap();
+        assert_eq!(object(&d), first);
+        assert_eq!(object(&h), 0);
+        STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            s.fail_write = false;
+            s.fail_sync = false;
+        });
+        p.address(1, h.as_ptr() as usize, Some(d.as_ptr() as usize), 256, 64)
+            .unwrap();
+        assert_ne!(object(&d), first);
         p.drain().unwrap();
     }
     #[test]
@@ -634,7 +672,9 @@ mod ownership_tests {
             .unwrap();
         let obj = object(&d);
         STATE.with(|s| s.borrow_mut().fail_sync = true);
-        assert!(p.address(1, h.as_ptr() as usize, None, 0, 0).is_err());
+        // Unbind performs neither synchronization nor publication.
+        assert_eq!(p.address(1, h.as_ptr() as usize, None, 0, 0), Ok(Some(0)));
+        assert!(p.drain().is_err());
         assert_eq!(object(&d), obj);
         assert!(p.objects.values().any(|o| *o == obj));
         STATE.with(|s| {
@@ -642,7 +682,7 @@ mod ownership_tests {
             s.fail_sync = false;
             s.fail_write = true;
         });
-        assert!(p.address(1, h.as_ptr() as usize, None, 0, 0).is_err());
+        assert!(p.drain().is_err());
         assert_eq!(object(&d), obj);
         STATE.with(|s| s.borrow_mut().fail_write = false);
         p.drain().unwrap();

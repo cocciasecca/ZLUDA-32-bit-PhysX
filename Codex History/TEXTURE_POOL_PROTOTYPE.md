@@ -18,3 +18,16 @@ Build/install (Batman closed):
 python3 tools/physx/push_build.py --yes --install
 
 Use profile diagnostic on the SAME successful run to disable pool for comparison without rebuild. No claim of guaranteed speedup.
+
+## Revision: retain pooled objects on unbind
+
+User reported 19 FPS with the first pool; this is not a controlled timing attribution.
+The next revision removes the explicit context synchronization and device-zero copy
+from pooled unbind. It marks the binding logically unbound while retaining ownership
+of the device-referenced object. Repeated unbinds are local; setters after unbind
+only change host state until the next bind. Bind synchronization remains unchanged.
+Drain synchronizes, clears retained unbound globals, restores bound native references,
+and only then destroys pooled objects. Failed clears retain ownership for retry.
+34 portable tests pass (11 pool tests), including unbound setters and cleanup failures.
+Windows compilation and GPU correctness/performance remain to be verified by the script
+and the user's game run. This is a revision of the pool, not a separate optimization.
