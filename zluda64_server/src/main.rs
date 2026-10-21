@@ -3,14 +3,10 @@
 
 #[cfg(feature = "physx-diagnostics")]
 mod diagnostics;
-#[cfg(feature = "physx-texture-reuse")]
-mod kernel_textures;
 #[cfg(feature = "physx-diagnostics")]
 mod texture_diagnostics;
-#[cfg(feature = "physx-texture-reuse")]
-mod texture_reuse;
-#[cfg(feature = "physx-texture-reuse")]
-mod texture_shadow;
+#[cfg(feature = "physx-diagnostics")]
+mod unbind_probe;
 
 use cuda_macros::cuda_function_declarations;
 use cuda_types::cuda::*;
@@ -33,12 +29,8 @@ use windows::Win32::System::Threading::*;
 use zluda_server_common::*;
 
 struct State {
-    #[cfg(feature = "physx-texture-reuse")]
-    texture_shadow: texture_shadow::Shadow,
-    #[cfg(feature = "physx-texture-reuse")]
-    texture_reuse: Option<texture_reuse::TextureReuse>,
-    #[cfg(feature = "physx-texture-reuse")]
-    retain_textures_across_transfers: bool,
+    #[cfg(feature = "physx-diagnostics")]
+    split_unbind: bool,
     #[cfg(feature = "physx-diagnostics")]
     texture_history: texture_diagnostics::TextureHistory,
     ctx: CUcontext,
@@ -157,8 +149,6 @@ impl ModuleLaunchData {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let module_data = Module {
-            #[cfg(feature = "physx-texture-reuse")]
-            kernel_textures: BTreeMap::new(),
             globals: Rc::new(globals),
             texrefs: FxHashMap::default(),
         };
@@ -168,8 +158,6 @@ impl ModuleLaunchData {
 }
 
 struct Module {
-    #[cfg(feature = "physx-texture-reuse")]
-    kernel_textures: BTreeMap<String, kernel_textures::Usage>,
     globals: Rc<Vec<Global>>,
     texrefs: FxHashMap<Vec<u8>, u32>,
 }
@@ -187,8 +175,6 @@ impl Global {
 }
 
 struct Function {
-    #[cfg(feature = "physx-texture-reuse")]
-    texture_usage: kernel_textures::Usage,
     globals: Rc<Vec<Global>>,
 }
 
@@ -292,15 +278,8 @@ impl State {
         unsafe { cuDevicePrimaryCtxRetain(&mut ctx, device) }?;
         unsafe { cuCtxSetCurrent(ctx) }?;
         Ok(Self {
-            #[cfg(feature = "physx-texture-reuse")]
-            texture_shadow: texture_shadow::Shadow::default(),
-            #[cfg(feature = "physx-texture-reuse")]
-            retain_textures_across_transfers: std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS")
-                .as_deref()
-                == Ok("1"),
-            #[cfg(feature = "physx-texture-reuse")]
-            texture_reuse: (std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE").as_deref() == Ok("1"))
-                .then(texture_reuse::TextureReuse::default),
+            #[cfg(feature = "physx-diagnostics")]
+            split_unbind: std::env::var("ZLUDA_PHYSX_SPLIT_UNBIND").as_deref() == Ok("1"),
             #[cfg(feature = "physx-diagnostics")]
             texture_history: texture_diagnostics::TextureHistory::default(),
             ctx,
@@ -336,22 +315,12 @@ fn main() -> std::io::Result<()> {
     write_git_version(&mut remote)?;
     unsafe { WaitForSingleObject(*local.event, INFINITE) };
     loop {
-        #[cfg(feature = "physx-texture-reuse")]
-        if remote.shared_memory.read_header() != 0 {
-            diagnostics::count("shadow/error_reset", state.texture_shadow.reset());
-        }
         let opcode = local.shared_memory.read_header();
         if opcode == u32::MAX {
             let new_shmem_name =
                 unsafe { String::from_utf8_unchecked(local.shared_memory.read_buffer().to_vec()) };
             let new_shmem = unsafe { SharedMemory::open(new_shmem_name, None) }?;
             local.shared_memory = new_shmem;
-            continue;
-        }
-        #[cfg(feature = "physx-texture-reuse")]
-        if let Err(error) = state.texture_reuse_barrier(opcode, &local) {
-            remote.shared_memory.write_header(error.0.get());
-            unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
             continue;
         }
         match Opcode::from_repr(opcode) {
@@ -491,25 +460,6 @@ fn main() -> std::io::Result<()> {
                 #[cfg(feature = "physx-diagnostics")]
                 let name = {
                     let input: ArchivedcuTexRefSetAddress_v2In = local.shared_memory.read_body();
-                    #[cfg(feature = "physx-texture-reuse")]
-                    if state.texture_reuse.as_ref().is_some_and(|cache| {
-                        cache.can_reuse(
-                            input.hTexRef.to_native(),
-                            input.dptr.to_native(),
-                            input.bytes.to_native(),
-                        )
-                    }) {
-                        // Successful requests in this category skipped native rebinding;
-                        // failures (e.g. the retained sync) are counted separately.
-                        "texture_address/cached_rebind"
-                    } else {
-                        state.texture_history.classify(
-                            input.hTexRef.to_native(),
-                            input.dptr.to_native(),
-                            input.bytes.to_native(),
-                        )
-                    }
-                    #[cfg(not(feature = "physx-texture-reuse"))]
                     state.texture_history.classify(
                         input.hTexRef.to_native(),
                         input.dptr.to_native(),
@@ -697,8 +647,7 @@ fn cu_module_unload(
     state.texture_history.clear();
     let hmod = CUmodule(state.handles.remove(input.hmod.to_native())?);
     if let Some(module) = state.modules.modules.remove(&hmod) {
-        // Native function addresses may be reused after unload. Do not retain
-        // analysis or launch metadata associated with the old module.
+        // Do not retain launch metadata when native function handles are reused.
         state
             .modules
             .functions
@@ -921,20 +870,6 @@ fn cu_tex_ref_set_format(
     state: &mut State,
     input: &ArchivedcuTexRefSetFormatIn,
 ) -> Result<cuTexRefSetFormatOut, CUerror> {
-    #[cfg(feature = "physx-texture-reuse")]
-    if let Some(cache) = state.texture_reuse.as_mut() {
-        let mut backend = BridgeTextures {
-            handles: &state.handles,
-            devmemory: &state.devmemory,
-        };
-        cache.format(
-            &mut backend,
-            input.hTexRef.to_native(),
-            input.fmt.to_native(),
-            input.NumPackedComponents.to_native(),
-        )?;
-        return Ok(cuTexRefSetFormatOut {});
-    }
     let tex_ref = state.handles.get(input.hTexRef.to_native())?;
     unsafe {
         cuTexRefSetFormat(
@@ -950,19 +885,6 @@ fn cu_tex_ref_set_flags(
     state: &mut State,
     input: &ArchivedcuTexRefSetFlagsIn,
 ) -> Result<cuTexRefSetFlagsOut, CUerror> {
-    #[cfg(feature = "physx-texture-reuse")]
-    if let Some(cache) = state.texture_reuse.as_mut() {
-        let mut backend = BridgeTextures {
-            handles: &state.handles,
-            devmemory: &state.devmemory,
-        };
-        cache.flags(
-            &mut backend,
-            input.hTexRef.to_native(),
-            input.Flags.to_native(),
-        )?;
-        return Ok(cuTexRefSetFlagsOut {});
-    }
     let tex_ref = state.handles.get(input.hTexRef.to_native())?;
     unsafe { cuTexRefSetFlags(tex_ref, input.Flags.to_native()) }?;
     Ok(cuTexRefSetFlagsOut {})
@@ -972,33 +894,43 @@ fn cu_tex_ref_set_address_v2(
     state: &mut State,
     input: &ArchivedcuTexRefSetAddress_v2In,
 ) -> Result<cuTexRefSetAddress_v2Out, CUerror> {
-    let handle = input.hTexRef.to_native();
-    let pointer = input.dptr.to_native();
-    let bytes = input.bytes.to_native();
-    #[cfg(feature = "physx-texture-reuse")]
-    let byte_offset = if let Some(cache) = state.texture_reuse.as_mut() {
-        let mut backend = BridgeTextures {
-            handles: &state.handles,
-            devmemory: &state.devmemory,
-        };
-        cache.address(&mut backend, handle, pointer, bytes)?
-    } else {
-        texture_address_native(&state.handles, &state.devmemory, handle, pointer, bytes)?
+    let mut byte_offset = 0;
+    let dptr = input.dptr.to_native();
+    let dptr = CUdeviceptr_v2(state.devmemory.translate(dptr)?);
+    let handle = state.handles.get(input.hTexRef.to_native())?;
+    let mut native = || unsafe {
+        cuTexRefSetAddress_v2(
+            &mut byte_offset,
+            handle,
+            dptr,
+            input.bytes.to_native() as usize,
+        )
     };
-    #[cfg(not(feature = "physx-texture-reuse"))]
-    let byte_offset =
-        texture_address_native(&state.handles, &state.devmemory, handle, pointer, bytes)?;
-    #[cfg(feature = "physx-texture-reuse")]
+    #[cfg(feature = "physx-diagnostics")]
     {
-        diagnostics::count("shadow/address_observed", 1);
-        if pointer == 0 {
-            diagnostics::count("shadow/unbind_observed", 1);
-        }
+        let split = state.split_unbind && input.dptr.to_native() == 0;
+        unbind_probe::run(
+            split,
+            || {
+                let timer = diagnostics::Timer::start("probe/unbind_pre_sync");
+                let result = unsafe { cuCtxSynchronize() };
+                timer.finish(result.as_ref().err().map_or(0, |e| e.0.get()));
+                result
+            },
+            || {
+                if split {
+                    let timer = diagnostics::Timer::start("probe/unbind_after_sync");
+                    let result = native();
+                    timer.finish(result.as_ref().err().map_or(0, |e| e.0.get()));
+                    result
+                } else {
+                    native()
+                }
+            },
+        )?;
     }
-    #[cfg(feature = "physx-texture-reuse")]
-    if let Some(event) = state.texture_shadow.address(handle, pointer, bytes) {
-        diagnostics::count(event, 1);
-    }
+    #[cfg(not(feature = "physx-diagnostics"))]
+    native()?;
     #[cfg(feature = "physx-diagnostics")]
     state.texture_history.succeeded(
         input.hTexRef.to_native(),
@@ -1203,19 +1135,6 @@ fn cu_module_get_function(
         .functions
         .entry(hfunc)
         .or_insert_with(|| Function {
-            #[cfg(feature = "physx-texture-reuse")]
-            texture_usage: state.modules.modules[&CUmodule(hmod)]
-                .kernel_textures
-                .get(
-                    input
-                        .name
-                        .as_slice()
-                        .strip_suffix(&[0])
-                        .and_then(|n| std::str::from_utf8(n).ok())
-                        .unwrap_or(""),
-                )
-                .copied()
-                .unwrap_or(kernel_textures::Usage::Unknown),
             globals: Rc::clone(&state.modules.modules[&CUmodule(hmod)].globals),
         });
     Ok(cuModuleGetFunctionOut {
@@ -1230,15 +1149,6 @@ fn cu_module_load_data(
     let mut module = unsafe { mem::zeroed() };
     unsafe { cuModuleLoadData(&mut module, input.image.as_ptr().cast()) }?;
     unsafe { state.modules.new_module(&mut state.devmemory, module) }?;
-    #[cfg(feature = "physx-texture-reuse")]
-    {
-        state
-            .modules
-            .modules
-            .get_mut(&module)
-            .unwrap()
-            .kernel_textures = kernel_textures::analyze(input.image.as_slice());
-    }
     Ok(cuModuleLoadDataOut {
         module: u32_le::from_native(state.handles.insert(module.0)),
     })
@@ -1516,179 +1426,4 @@ cuda_function_declarations! {
         cuDevicePrimaryCtxRetain,
         cuCtxSetCurrent,
     ]
-}
-
-fn texture_address_native(
-    handles: &HandlePool,
-    devmemory: &Allocator,
-    handle: u32,
-    pointer: u32,
-    bytes: u32,
-) -> Result<u32, CUerror> {
-    let mut offset = 0;
-    let pointer = CUdeviceptr_v2(devmemory.translate(pointer)?);
-    unsafe { cuTexRefSetAddress_v2(&mut offset, handles.get(handle)?, pointer, bytes as usize) }?;
-    Ok(offset as u32)
-}
-
-#[cfg(feature = "physx-texture-reuse")]
-struct BridgeTextures<'a> {
-    handles: &'a HandlePool,
-    devmemory: &'a Allocator,
-}
-
-#[cfg(feature = "physx-texture-reuse")]
-impl texture_reuse::Backend for BridgeTextures<'_> {
-    type Error = CUerror;
-    fn synchronize(&mut self) -> Result<(), CUerror> {
-        unsafe { cuCtxSynchronize() }
-    }
-    fn address(&mut self, handle: u32, pointer: u32, bytes: u32) -> Result<u32, CUerror> {
-        texture_address_native(self.handles, self.devmemory, handle, pointer, bytes)
-    }
-    fn flags(&mut self, handle: u32, flags: u32) -> Result<(), CUerror> {
-        unsafe { cuTexRefSetFlags(self.handles.get(handle)?, flags) }
-    }
-    fn format(&mut self, handle: u32, format: u32, channels: i32) -> Result<(), CUerror> {
-        unsafe { cuTexRefSetFormat(self.handles.get(handle)?, CUarray_format(format), channels) }
-    }
-}
-
-#[cfg(feature = "physx-texture-reuse")]
-impl State {
-    fn texture_reuse_barrier(&mut self, opcode: u32, local: &Endpoint) -> Result<(), CUerror> {
-        use texture_reuse::Boundary;
-        let boundary = match Opcode::from_repr(opcode) {
-            Some(
-                Opcode::cuTexRefSetAddress_v2
-                | Opcode::cuTexRefSetFlags
-                | Opcode::cuTexRefSetFormat
-                | Opcode::cuMemGetAddressRange_v2,
-            ) => Boundary::TextureMetadata,
-            Some(
-                Opcode::cuMemcpyHtoD_v2
-                | Opcode::cuMemcpyHtoDAsync_v2
-                | Opcode::cuMemcpyDtoHAsync_v2
-                | Opcode::cuMemcpyDtoD_v2
-                | Opcode::cuMemcpyDtoDAsync_v2
-                | Opcode::cuMemsetD8_v2,
-            ) => Boundary::Transfer,
-            Some(Opcode::cuCtxSynchronize) => Boundary::Synchronize,
-            Some(Opcode::cuLaunchKernel) => Boundary::Kernel,
-            Some(
-                Opcode::cuMemFree_v2
-                | Opcode::cuMemAlloc_v2
-                | Opcode::cuModuleUnload
-                | Opcode::cuModuleLoadData
-                | Opcode::cuCtxDetach
-                | Opcode::cuInit,
-            ) => Boundary::Lifetime,
-            _ => Boundary::Other,
-        };
-        // Shadow events are counts, never saved-time estimates or permission to skip cleanup.
-        match Opcode::from_repr(opcode) {
-            Some(Opcode::cuTexRefSetFlags | Opcode::cuTexRefSetFormat) => {
-                let event = if matches!(Opcode::from_repr(opcode), Some(Opcode::cuTexRefSetFlags)) {
-                    let input: ArchivedcuTexRefSetFlagsIn = local.shared_memory.read_body();
-                    self.texture_shadow
-                        .flags(input.hTexRef.to_native(), input.Flags.to_native())
-                } else {
-                    let input: ArchivedcuTexRefSetFormatIn = local.shared_memory.read_body();
-                    self.texture_shadow.format(
-                        input.hTexRef.to_native(),
-                        input.fmt.to_native(),
-                        input.NumPackedComponents.to_native(),
-                    )
-                };
-                if let Some(event) = event {
-                    diagnostics::count(event, 1);
-                }
-            }
-            _ if matches!(boundary, Boundary::Kernel) => {
-                let input = local.shared_memory.deserialize_body2::<cuLaunchKernelIn>();
-                let candidate = self
-                    .handles
-                    .get(input.f.to_native())
-                    .ok()
-                    .and_then(|f| self.modules.functions.get(&CUfunction(f)))
-                    .is_some_and(|f| {
-                        f.texture_usage == kernel_textures::Usage::NoTextureInstructions
-                    });
-                diagnostics::count("shadow/kernel_observed", 1);
-                if candidate {
-                    diagnostics::count("shadow/candidate_kernel_observed", 1);
-                    diagnostics::count(
-                        "shadow/pending_at_candidate",
-                        self.texture_shadow.pending(),
-                    );
-                }
-                diagnostics::count("shadow/kernel_end", self.texture_shadow.boundary(candidate));
-            }
-            _ if !texture_reuse::can_defer(boundary, self.retain_textures_across_transfers) => {
-                diagnostics::count("shadow/other_boundary_end", self.texture_shadow.reset());
-            }
-            _ => (),
-        }
-        // Copies/memsets use allocation addresses and do not observe texture
-        // bindings. They still execute normally, including existing syncs.
-        // Kernels, frees, unloads and all unknown requests ALWAYS drain first.
-        if texture_reuse::can_defer(boundary, self.retain_textures_across_transfers) {
-            return Ok(());
-        }
-        let kernel_drain_label = if matches!(boundary, Boundary::Kernel)
-            && self.texture_reuse.as_ref().is_some_and(|c| c.has_pending())
-        {
-            // Input is framed: use the same deserializer as normal dispatch.
-            // This read-only classification never changes whether we drain.
-            let input = local.shared_memory.deserialize_body2::<cuLaunchKernelIn>();
-            let usage = self
-                .handles
-                .get(input.f.to_native())
-                .ok()
-                .and_then(|f| self.modules.functions.get(&CUfunction(f)))
-                .map(|f| f.texture_usage)
-                .unwrap_or(kernel_textures::Usage::Unknown);
-            match usage {
-                kernel_textures::Usage::NoTextureInstructions => {
-                    "texture_reuse/drain_before_kernel/no_texture_instructions"
-                }
-                kernel_textures::Usage::TextureInstructions => {
-                    "texture_reuse/drain_before_kernel/texture_instructions"
-                }
-                kernel_textures::Usage::Unknown => "texture_reuse/drain_before_kernel/unknown",
-            }
-        } else {
-            "texture_reuse/drain_before_kernel"
-        };
-        if let Some(cache) = self.texture_reuse.as_mut() {
-            if cache.has_pending() {
-                let timer = diagnostics::Timer::start(match boundary {
-                    Boundary::Transfer => "texture_reuse/drain_before_transfer",
-                    Boundary::Synchronize => "texture_reuse/drain_before_sync",
-                    Boundary::Kernel => kernel_drain_label,
-                    Boundary::Lifetime => "texture_reuse/drain_before_lifetime",
-                    _ => "texture_reuse/drain_before_other",
-                });
-                let mut backend = BridgeTextures {
-                    handles: &self.handles,
-                    devmemory: &self.devmemory,
-                };
-                let result = cache.drain(&mut backend);
-                timer.finish(result.as_ref().err().map_or(0, |error| error.0.get()));
-                result?;
-            }
-            if matches!(
-                Opcode::from_repr(opcode),
-                Some(
-                    Opcode::cuMemFree_v2
-                        | Opcode::cuModuleUnload
-                        | Opcode::cuCtxDetach
-                        | Opcode::cuInit
-                )
-            ) {
-                cache.invalidate();
-            }
-        }
-        Ok(())
-    }
 }

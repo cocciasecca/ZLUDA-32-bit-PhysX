@@ -33,11 +33,13 @@ def deploy(run_id, host='deck@192.168.10.67', key=None):
         root = Path(temp)
         payload = root/'payload'
         run('gh', 'run', 'download', run_id, '--repo', REPO, '-n', f'physx-servers-{sha}', '-D', str(payload))
-        expected = {'32/nvcuda.dll', 'reuse/zluda64_server.exe', 'control/zluda64_server.exe', 'diagnostic/zluda64_server.exe'}
+        expected = {'32/nvcuda.dll', 'control/zluda64_server.exe', 'diagnostic/zluda64_server.exe'}
         seen = set()
         for row in (payload/'SHA256SUMS.txt').read_text(encoding='utf-8-sig').splitlines():
             digest, name = row.split(None, 1)
             name = name.replace('\\', '/')
+            if name == 'reuse/zluda64_server.exe':
+                continue  # Archived four-binary packages remain installable.
             if name not in expected or name in seen:
                 raise RuntimeError('Manifest inatteso')
             seen.add(name)

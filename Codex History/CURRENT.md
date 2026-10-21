@@ -17,3 +17,5 @@ The next installation through tools/physx/push_build.py --install selects the co
 Work on branch experiment/physx-diagnostics in /private/tmp/zluda-physx-diagnostics; original IDE checkout stays on master. tools/physx/PUSH_BUILD.md documents the current automation. Historical fixed-run installers are retained for provenance, not current deployment. Experiments remain available behind existing build features; no deletion of measurement evidence or rollback packages.
 
 Next investigation should target a different mechanism and use this simpler baseline. Do not repeat the no-texture-kernel deferral experiment without new evidence.
+
+Active branch cleanup: texture experiments moved to tag archive/physx-texture-deferral-2026-10-21. Three artifacts now: control, diagnostic, proxy. Optional pre-unbind synchronization probe prepared and locally tested; disabled by default, not deployed. See UNBIND_PROBE.md.

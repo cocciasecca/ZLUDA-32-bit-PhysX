@@ -45,6 +45,7 @@ new_settings=settings.read_text()+f'''
 user_settings["ZLUDA_PHYSX_TEXTURE_REUSE"] = "0"
 user_settings["ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS"] = "0"
 user_settings["ZLUDA_PHYSX_RANGE_CACHE"] = "1"
+user_settings["ZLUDA_PHYSX_SPLIT_UNBIND"] = "0"
 user_settings.pop("ZLUDA_PHYSX_DIAGNOSTICS", None)
 import os as _zluda_environment
 _zluda_environment.environ.pop("ZLUDA_PHYSX_DIAGNOSTICS", None)
