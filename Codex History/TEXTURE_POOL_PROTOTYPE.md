@@ -15,6 +15,6 @@ Tests:10 standalone tests with -D warnings. Native-control-flow implementation r
 First run: visually check PhysX against baseline; report glitches/crash immediately. At ci sono read pool counters and API errors before interpreting FPS. Fallback may be frequent because this deliberately restricted v1 favors correctness. Native fallback does not hide synchronization/publication failures. Backups remain install-script managed.
 
 Build/install (Batman closed):
-python3 tools/physx/push_build.py --yes --install --profile texture-pool
+python3 tools/physx/push_build.py --yes --install
 
 Use profile diagnostic on the SAME successful run to disable pool for comparison without rebuild. No claim of guaranteed speedup.

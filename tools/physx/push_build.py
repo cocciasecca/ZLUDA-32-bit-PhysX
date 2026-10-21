@@ -27,13 +27,12 @@ def main():
     parser.add_argument('--install-run', help='Install an existing run without commit, push or build')
     parser.add_argument('--host', default='deck@192.168.10.67')
     parser.add_argument('--key', help='SSH key path')
-    parser.add_argument('--profile', choices=['baseline','diagnostic','unbind-probe','texture-global', 'pool-capture', 'texture-pool'], default='baseline', help='diagnostic: log ON/probe OFF; unbind-probe: log ON/probe ON')
     args = parser.parse_args()
     if args.no_wait and (args.install or args.install_run):
         parser.error('--no-wait non è compatibile con installazione')
     if args.install_run:
         from deploy_legion import deploy
-        deploy(args.install_run, args.host, args.key, args.profile)
+        deploy(args.install_run, args.host, args.key)
         return
     for tool in ('git', 'gh'):
         if not shutil.which(tool):
@@ -54,6 +53,7 @@ def main():
     if origin not in (f'https://github.com/{REPO}.git', f'https://github.com/{REPO}',
                        f'git@github.com:{REPO}.git', f'ssh://git@github.com/{REPO}.git'):
         raise RuntimeError(f'Origin inatteso: {origin}')
+    run(sys.executable, str(root/'tools/physx/check_local.py'), cwd=root, capture=False)
     run('gh', 'auth', 'status', capture=False)
     status = run('git', 'status', '--short', cwd=root)
     if status:
@@ -92,7 +92,7 @@ def main():
         print('Build riuscita. I binari sono negli artifact del link sopra.')
     if args.install:
         from deploy_legion import deploy
-        deploy(run_id, args.host, args.key, args.profile)
+        deploy(run_id, args.host, args.key)
 
 
 if __name__ == '__main__':

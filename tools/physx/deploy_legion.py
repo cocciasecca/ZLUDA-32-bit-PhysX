@@ -17,7 +17,7 @@ def run(*args):
     return subprocess.check_output(args, text=True)
 
 
-def deploy(run_id, host='deck@192.168.10.67', key=None, profile='baseline'):
+def deploy(run_id, host='deck@192.168.10.67', key=None, profile='texture-pool'):
     if profile not in ('baseline', 'diagnostic', 'unbind-probe', 'texture-global', 'pool-capture', 'texture-pool'):
         raise RuntimeError('Profilo non valido')
     run_id = str(run_id)
@@ -69,6 +69,5 @@ if __name__ == '__main__':
     parser.add_argument('run_id')
     parser.add_argument('--host', default='deck@192.168.10.67')
     parser.add_argument('--key')
-    parser.add_argument('--profile', choices=['baseline','diagnostic','unbind-probe','texture-global', 'pool-capture', 'texture-pool'], default='baseline')
     args = parser.parse_args()
-    deploy(args.run_id, args.host, args.key, args.profile)
+    deploy(args.run_id, args.host, args.key)
