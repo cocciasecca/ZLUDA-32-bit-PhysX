@@ -1,3 +1,24 @@
+# Current configuration: restored texture deferral
+
+The active server sources and Cargo.lock are restored exactly from `3e9ea16`,
+the revision associated with the user's 29 FPS report. This restores deferred
+texture destruction, transfer retention, kernel classification and its original
+diagnostics. Range cache remains enabled. It does not establish a 29 FPS guarantee.
+
+Removed from active source/build: texture-object pool, pool capture, texture-global
+probe and split-unbind probe. Their history and measurements remain in Git/docs.
+The user reported 19 FPS for the first pool and 22 FPS for its revised unbind path.
+
+The single push/build/install script now builds `physx-texture-reuse`, installs
+that server with its matching proxy, and enables REUSE=1, REUSE_TRANSFERS=1,
+RANGE_CACHE=1 and the original diagnostics. Old pool/probe flags are reset to 0.
+Package configuration is checked before upload to prevent installing a stale pool
+artifact. Batman/server closed checks, backup and hash checks remain automatic.
+45 portable tests passed; kernel-analysis tests and Windows compilation run in CI.
+No build, push or installation was performed by the agent.
+
+## Historical notes (superseded)
+
 # Current state — 2026-10-21
 
 ## Decision: close the texture-deferral/cache investigation

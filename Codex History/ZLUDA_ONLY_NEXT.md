@@ -1,3 +1,5 @@
+> Stato corrente: ripristinato il rinvio delle distruzioni di `3e9ea16`; pool rimosso. Vedi CURRENT.md. Le proposte sotto sono storiche.
+
 # ZLUDA-only investigation after reuse trial
 
 User excludes HIP modifications. Original texture reuse remains OFF; user reports24FPS OFF versus21ON, not a frame-time trace.

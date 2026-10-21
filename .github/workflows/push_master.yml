@@ -216,27 +216,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:RUNNER_TEMP/texture-diagnostics-tests.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Test optional unbind probe
+      - name: Test restored texture deferral and kernel analysis
         shell: pwsh
         run: |
-          rustc --edition=2021 --test zluda64_server/src/unbind_probe.rs -o "$env:RUNNER_TEMP/unbind-probe-tests.exe"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & "$env:RUNNER_TEMP/unbind-probe-tests.exe"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Test texture global probe layout checks
-        shell: pwsh
-        run: |
-          cargo test --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-diagnostics texture_global_probe::tests
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Test combined pool capture
-        shell: pwsh
-        run: |
-          cargo test --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-diagnostics pool_capture::
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Test texture pool ownership and fallback
-        shell: pwsh
-        run: |
-          cargo test --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-diagnostics texture_pool::
+          cargo test --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-texture-reuse
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build control and diagnostic servers
         shell: pwsh
@@ -245,7 +228,7 @@ jobs:
           cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe artifacts/control/
-          cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-diagnostics
+          cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc --features physx-texture-reuse
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe artifacts/diagnostic/
       - name: Test allocation range cache
@@ -268,8 +251,9 @@ jobs:
             "Commit: $env:GITHUB_SHA"
             "Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
             "Target: x86_64-pc-windows-msvc; profile: release; Cargo.lock: --locked"
-            "Control: features omitted; diagnostic: physx-diagnostics enabled"
-            "Default installer profile: control server + 32-bit range metadata cache, diagnostics and texture deferral OFF. Range cache: opt-in ZLUDA_PHYSX_RANGE_CACHE=1; bounded to 256 entries; texture reuse should remain OFF. Stats use diagnostics base plus .range-cache.pid-N.csv, cumulative every 4096 queries."
+            "Configuration: texture-deferral-3e9ea16"
+            "Control: features omitted; diagnostic: physx-texture-reuse enabled"
+            "Current installation: texture deferral and transfer deferral ON, range cache ON, diagnostics ON; historical server sources restored from 3e9ea16. Pool removed."
             (rustc --version)
             (cargo --version)
             ""

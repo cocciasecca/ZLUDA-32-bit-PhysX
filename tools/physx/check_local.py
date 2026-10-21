@@ -23,9 +23,7 @@ def main():
         print('Python e diff verificati. Rust non disponibile: test Rust eseguiti da GitHub Actions.')
         return
     version = subprocess.check_output([rustc, '-vV'])
-    names = ['diagnostics', 'texture_diagnostics', 'unbind_probe', 'pool_capture']
-    if b'windows' not in version:
-        names += ['texture_global_probe', 'texture_pool']
+    names = ['diagnostics', 'texture_diagnostics', 'texture_reuse', 'texture_shadow']
     sources = [root/f'zluda64_server/src/{name}.rs' for name in names]
     sources.append(root/'zluda32/src/range_cache.rs')
     digest = hashlib.sha256(version + Path(__file__).read_bytes())

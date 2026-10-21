@@ -11,8 +11,9 @@ Installa soltanto una build riuscita, verificando revisione, hash e architettura
 Controlla automaticamente che Batman e il server siano chiusi prima del download
 e nuovamente prima della sostituzione. Se sono aperti, si ferma senza chiuderli.
 
-Non occorre scegliere un profilo: la configurazione corrente usa il prototipo
-texture pool; cattura LRU, probe del global e probe unbind sono spenti.
+Non occorre scegliere un profilo: la configurazione corrente ripristina il rinvio delle distruzioni di `3e9ea16`,
+con riuso attraverso i trasferimenti, cache e diagnostica originali attivi.
+Il pool e le sue sonde sono rimossi. I vecchi pacchetti sono rifiutati.
 Le opzioni storiche `--profile` non sono più necessarie né accettate.
 
 Per riprendere soltanto un'installazione interrotta (per esempio gioco aperto):
@@ -29,4 +30,4 @@ da aggiornare. Prima di commit vengono elencate tutte le modifiche incluse.
 
 Senza Rust locale i controlli Python/diff vengono comunque eseguiti e i test Rust
 restano obbligatori in CI. Nessun risultato locale sostituisce i test Windows.
-Il miglioramento prestazionale del pool deve ancora essere verificato sulla GPU.
+Il confronto prestazionale della configurazione ripristinata resta da fare sulla GPU.

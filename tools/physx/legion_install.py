@@ -2,10 +2,10 @@ import sys
 from pathlib import Path
 import hashlib,json,shutil,subprocess,os
 run_id=sys.argv[1];commit=sys.argv[2]
-profile=sys.argv[3] if len(sys.argv)>3 else 'baseline'
-assert profile in ('baseline','diagnostic','unbind-probe','texture-global','pool-capture','texture-pool')
-diagnostic=profile!='baseline'
-probe=profile=='unbind-probe'
+profile=sys.argv[3] if len(sys.argv)>3 else 'texture-deferral'
+assert profile == 'texture-deferral'
+diagnostic=True
+probe=False
 assert run_id.isdecimal() and len(commit)==40 and all(c in '0123456789abcdef' for c in commit)
 root=Path('/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment')
 original=root.parent/'ZludaProton'
@@ -48,8 +48,8 @@ saved_settings=backup/'user_settings.py'
 shutil.copy2(settings,saved_settings)
 new_settings=settings.read_text()+f'''
 # Profile {profile}, run {run_id}.
-user_settings["ZLUDA_PHYSX_TEXTURE_REUSE"] = "0"
-user_settings["ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS"] = "0"
+user_settings["ZLUDA_PHYSX_TEXTURE_REUSE"] = "1"
+user_settings["ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS"] = "1"
 user_settings["ZLUDA_PHYSX_RANGE_CACHE"] = "1"
 user_settings["ZLUDA_PHYSX_SPLIT_UNBIND"] = "{int(probe)}"
 user_settings["ZLUDA_PHYSX_TEXTURE_GLOBAL_PROBE"] = "{int(profile in ('texture-global','pool-capture'))}"
@@ -76,6 +76,6 @@ except Exception:
  raise
 assert all(sha(prefix/rel)==h for rel,h in prefix_before.items())
 assert sha(root/'zluda-libs/libamd_comgr.so.3')==sha(original/'zluda-libs/libamd_comgr.so.3')
-record={'run':int(run_id),'commit':commit,'files':{rel:sha(root/rel) for _,rel in pairs},'prefix_unchanged':prefix_before,'previous_payload_backup':str(backup),'csv_suffix':'.pid-N.csv','profile':profile,'diagnostics_enabled':diagnostic,'split_unbind_enabled':probe,'texture_reuse_enabled':False,'texture_reuse_transfers':False,'range_cache_enabled':True,'settings_sha256':sha(settings)}
+record={'run':int(run_id),'commit':commit,'files':{rel:sha(root/rel) for _,rel in pairs},'prefix_unchanged':prefix_before,'previous_payload_backup':str(backup),'csv_suffix':'.pid-N.csv','profile':profile,'diagnostics_enabled':diagnostic,'split_unbind_enabled':probe,'texture_reuse_enabled':True,'texture_reuse_transfers':True,'range_cache_enabled':True,'settings_sha256':sha(settings)}
 record_path.write_text(json.dumps(record,indent=2)+'\n')
 print(json.dumps(record,indent=2))

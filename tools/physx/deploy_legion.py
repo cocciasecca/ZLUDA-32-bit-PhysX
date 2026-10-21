@@ -17,8 +17,8 @@ def run(*args):
     return subprocess.check_output(args, text=True)
 
 
-def deploy(run_id, host='deck@192.168.10.67', key=None, profile='texture-pool'):
-    if profile not in ('baseline', 'diagnostic', 'unbind-probe', 'texture-global', 'pool-capture', 'texture-pool'):
+def deploy(run_id, host='deck@192.168.10.67', key=None, profile='texture-deferral'):
+    if profile != 'texture-deferral':
         raise RuntimeError('Profilo non valido')
     run_id = str(run_id)
     if not run_id.isdecimal() or not re.fullmatch(r'[A-Za-z0-9_.-]+@[A-Za-z0-9.-]+', host):
@@ -35,6 +35,8 @@ def deploy(run_id, host='deck@192.168.10.67', key=None, profile='texture-pool'):
         root = Path(temp)
         payload = root/'payload'
         run('gh', 'run', 'download', run_id, '--repo', REPO, '-n', f'physx-servers-{sha}', '-D', str(payload))
+        if 'Configuration: texture-deferral-3e9ea16' not in (payload/'README.txt').read_text(encoding='utf-8-sig'):
+            raise RuntimeError('Build precedente incompatibile: esegui la build della configurazione corrente.')
         expected = {'32/nvcuda.dll', 'control/zluda64_server.exe', 'diagnostic/zluda64_server.exe'}
         seen = set()
         for row in (payload/'SHA256SUMS.txt').read_text(encoding='utf-8-sig').splitlines():
