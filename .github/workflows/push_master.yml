@@ -272,7 +272,7 @@ jobs:
             "Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
             "Target: x86_64-pc-windows-msvc; profile: release; Cargo.lock: --locked"
             "Control: features omitted; diagnostic: physx-diagnostics enabled"
-            "32-bit range metadata cache: opt-in ZLUDA_PHYSX_RANGE_CACHE=1; bounded to 256 entries; texture reuse should remain OFF. Stats use diagnostics base plus .range-cache.pid-N.csv, cumulative every 4096 queries."
+            "Default installer profile: control server + 32-bit range metadata cache, diagnostics and texture deferral OFF. Range cache: opt-in ZLUDA_PHYSX_RANGE_CACHE=1; bounded to 256 entries; texture reuse should remain OFF. Stats use diagnostics base plus .range-cache.pid-N.csv, cumulative every 4096 queries."
             "Reuse: physx-texture-reuse feature; additionally requires ZLUDA_PHYSX_TEXTURE_REUSE=1"
             "Reuse is an UNVALIDATED GPU prototype: preserves explicit barriers and defers native texture unbind within restricted bridge sequences."
             "Transfer-retention variant additionally requires ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS=1. Kernel/lifetime/unknown requests still drain; transfer/sync operations still execute normally."

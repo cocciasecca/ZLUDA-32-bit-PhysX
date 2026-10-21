@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Commit, push and build the PhysX experimental worktree. Never deploys."""
+"""Commit, push and build the PhysX experimental worktree. Optionally installs on Legion."""
 import argparse
 import json
 import re
@@ -23,7 +23,17 @@ def main():
     parser.add_argument('-m', '--message', default='Update PhysX diagnostic experiment')
     parser.add_argument('--yes', action='store_true', help='Commit all non-ignored changes without confirmation')
     parser.add_argument('--no-wait', action='store_true', help='Exit after starting the build')
+    parser.add_argument('--install', action='store_true', help='Install successful build on Legion; Batman must be closed')
+    parser.add_argument('--install-run', help='Install an existing run without commit, push or build')
+    parser.add_argument('--host', default='deck@192.168.10.67')
+    parser.add_argument('--key', help='SSH key path')
     args = parser.parse_args()
+    if args.no_wait and (args.install or args.install_run):
+        parser.error('--no-wait non è compatibile con installazione')
+    if args.install_run:
+        from deploy_legion import deploy
+        deploy(args.install_run, args.host, args.key)
+        return
     for tool in ('git', 'gh'):
         if not shutil.which(tool):
             raise RuntimeError(f'Manca {tool}: installalo prima di eseguire lo script.')
@@ -56,20 +66,32 @@ def main():
         run('git', 'commit', '-m', args.message, cwd=root, capture=False)
     sha = run('git', 'rev-parse', 'HEAD', cwd=root).strip()
     run('git', 'push', 'origin', f'HEAD:refs/heads/{BRANCH}', cwd=root, capture=False)
-    # Explicit repository prevents dispatch to the upstream fork parent.
-    output = run('gh', 'workflow', 'run', WORKFLOW, '--repo', REPO, '--ref', BRANCH, cwd=root)
-    print(output, end='', flush=True)
-    match = re.search(r'https://github\.com/' + re.escape(REPO) + r'/actions/runs/(\d+)', output)
-    if not match:
-        raise RuntimeError('Build avviata, ma gh non ha restituito il link. Controlla GitHub Actions; non rilanciare per errore una seconda build.')
-    run_id = match.group(1)
+    # Reuse successful or active runs of this exact revision instead of dispatching duplicates.
+    runs = json.loads(run('gh', 'run', 'list', '--repo', REPO, '--workflow', WORKFLOW,
+                          '--branch', BRANCH, '--commit', sha, '--limit', '30',
+                          '--json', 'databaseId,status,conclusion', cwd=root))
+    eligible = [r for r in runs if r['conclusion'] == 'success' or r['status'] != 'completed']
+    if eligible:
+        chosen = next((r for r in eligible if r['conclusion'] == 'success'), eligible[0])
+        run_id = str(chosen['databaseId'])
+        print(f'Riutilizzo build: https://github.com/{REPO}/actions/runs/{run_id}', flush=True)
+    else:
+        output = run('gh', 'workflow', 'run', WORKFLOW, '--repo', REPO, '--ref', BRANCH, cwd=root)
+        print(output, end='', flush=True)
+        match = re.search(r'https://github\.com/' + re.escape(REPO) + r'/actions/runs/(\d+)', output)
+        if not match:
+            raise RuntimeError('Build avviata ma link non restituito. Controlla GitHub Actions.')
+        run_id = match.group(1)
     info = json.loads(run('gh', 'run', 'view', run_id, '--repo', REPO, '--json', 'headSha,headBranch'))
     if info['headSha'] != sha or info['headBranch'] != BRANCH:
         raise RuntimeError('La build non corrisponde al commit inviato: controlla il link prima di usare i binari.')
-    print(f'Commit: {sha}\nNessuna installazione sulla Legion.', flush=True)
+    print(f'Commit: {sha}', flush=True)
     if not args.no_wait:
         run('gh', 'run', 'watch', run_id, '--repo', REPO, '--exit-status', cwd=root, capture=False)
         print('Build riuscita. I binari sono negli artifact del link sopra.')
+    if args.install:
+        from deploy_legion import deploy
+        deploy(run_id, args.host, args.key)
 
 
 if __name__ == '__main__':

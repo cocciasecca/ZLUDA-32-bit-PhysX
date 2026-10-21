@@ -1,0 +1,98 @@
+{
+  "seconds": 25.0171545,
+  "windows": 5,
+  "service_seconds": 19.377307,
+  "user_fps": "29",
+  "rows": {
+    "texture_reuse/drain_before_kernel/no_texture_instructions": {
+      "calls": 1426,
+      "errors": 0,
+      "total_ns": 9636973500
+    },
+    "texture_reuse/drain_before_kernel/texture_instructions": {
+      "calls": 1425,
+      "errors": 0,
+      "total_ns": 5018778400
+    },
+    "texture_address/bind_same_after_unbind": {
+      "calls": 25650,
+      "errors": 0,
+      "total_ns": 3107622900
+    },
+    "texture_address/unbind_bound": {
+      "calls": 25662,
+      "errors": 0,
+      "total_ns": 648708300
+    },
+    "zluda_server_common::cuMemcpyDtoHAsync_v2In": {
+      "calls": 4273,
+      "errors": 0,
+      "total_ns": 529243800
+    },
+    "zluda_server_common::cuMemcpyHtoDAsync_v2In": {
+      "calls": 27784,
+      "errors": 0,
+      "total_ns": 197215800
+    },
+    "zluda_server_common::cuLaunchKernelIn": {
+      "calls": 17810,
+      "errors": 0,
+      "total_ns": 125411000
+    },
+    "zluda_server_common::cuMemsetD8_v2In": {
+      "calls": 1425,
+      "errors": 0,
+      "total_ns": 73337900
+    },
+    "texture_address/unbind_already_unbound": {
+      "calls": 25650,
+      "errors": 0,
+      "total_ns": 20349000
+    },
+    "zluda_server_common::cuTexRefSetFormatIn": {
+      "calls": 25650,
+      "errors": 0,
+      "total_ns": 10550800
+    },
+    "zluda_server_common::cuTexRefSetFlagsIn": {
+      "calls": 25650,
+      "errors": 0,
+      "total_ns": 7865100
+    },
+    "zluda_server_common::cuCtxSynchronizeIn": {
+      "calls": 2137,
+      "errors": 0,
+      "total_ns": 1250500
+    },
+    "shadow/address_observed": {
+      "calls": 76962,
+      "errors": 0,
+      "total_ns": 0
+    },
+    "shadow/candidate_kernel_observed": {
+      "calls": 14960,
+      "errors": 0,
+      "total_ns": 0
+    },
+    "shadow/kernel_end": {
+      "calls": 17100,
+      "errors": 0,
+      "total_ns": 0
+    },
+    "shadow/kernel_observed": {
+      "calls": 17810,
+      "errors": 0,
+      "total_ns": 0
+    },
+    "shadow/pending_at_candidate": {
+      "calls": 179520,
+      "errors": 0,
+      "total_ns": 0
+    },
+    "shadow/unbind_observed": {
+      "calls": 51312,
+      "errors": 0,
+      "total_ns": 0
+    }
+  }
+}
