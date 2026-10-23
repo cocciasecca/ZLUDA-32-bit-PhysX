@@ -51,7 +51,9 @@ fn main() -> io::Result<()> {
         loop {
             let frame = match connection.receive_request() {
                 Ok(f) => f,
-                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => break,
+                // Windows may reset the TCP connection when the DLL process exits.
+                // Require clean allocation teardown AND a successful child below.
+                Err(e) if matches!(e.kind(), io::ErrorKind::UnexpectedEof | io::ErrorKind::ConnectionReset) => break,
                 Err(e) => return Err(e),
             };
             request
