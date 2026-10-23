@@ -51,31 +51,72 @@ impl Recorder {
             std::process::id(),
         );
         // Never truncate existing data. An invalid path disables diagnostics.
-        let mut file = OpenOptions::new().write(true).create_new(true).open(path).ok()?;
-        let epoch = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_nanos();
-        writeln!(file, "# pid={},unix_ns={epoch},git={}", std::process::id(),
-            option_env!("VERGEN_GIT_SHA").unwrap_or("standalone-test")).ok()?;
-        writeln!(file, "# texture_reuse_feature={},texture_reuse_enabled={}",
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .ok()?;
+        let epoch = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .ok()?
+            .as_nanos();
+        writeln!(
+            file,
+            "# pid={},unix_ns={epoch},git={}",
+            std::process::id(),
+            option_env!("VERGEN_GIT_SHA").unwrap_or("standalone-test")
+        )
+        .ok()?;
+        writeln!(
+            file,
+            "# texture_reuse_feature={},texture_reuse_enabled={}",
             cfg!(feature = "physx-texture-reuse"),
-            cfg!(feature = "physx-texture-reuse") && std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE").as_deref() == Ok("1")
-        ).ok()?;
-        writeln!(file, "# texture_reuse_transfers_requested={}",
-            std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS").as_deref() == Ok("1")).ok()?;
-        writeln!(file, "window_start_ns,window_end_ns,request,calls,errors,total_ns,max_ns").ok()?;
+            cfg!(feature = "physx-texture-reuse")
+                && std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE").as_deref() == Ok("1")
+        )
+        .ok()?;
+        writeln!(
+            file,
+            "# texture_reuse_transfers_requested={}",
+            std::env::var("ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS").as_deref() == Ok("1")
+        )
+        .ok()?;
+        writeln!(
+            file,
+            "window_start_ns,window_end_ns,request,calls,errors,total_ns,max_ns"
+        )
+        .ok()?;
         let origin = Instant::now();
-        Some(Self { file, origin, window: origin, stats: BTreeMap::new() })
+        Some(Self {
+            file,
+            origin,
+            window: origin,
+            stats: BTreeMap::new(),
+        })
     }
 
-    fn record(&mut self, name: &'static str, elapsed: Duration, status: u32, now: Instant) -> io::Result<()> {
-        self.stats.entry(name).or_default().record(elapsed.as_nanos(), status);
+    fn record(
+        &mut self,
+        name: &'static str,
+        elapsed: Duration,
+        status: u32,
+        now: Instant,
+    ) -> io::Result<()> {
+        self.stats
+            .entry(name)
+            .or_default()
+            .record(elapsed.as_nanos(), status);
         if now.duration_since(self.window) >= Duration::from_secs(5) {
             let start = self.window.duration_since(self.origin).as_nanos();
             let end = now.duration_since(self.origin).as_nanos();
             // At most one row per compiled request type per window; no event log.
             let mut batch = Vec::new();
             for (name, stats) in &self.stats {
-                writeln!(batch, "{start},{end},{name},{},{},{},{}",
-                    stats.calls, stats.errors, stats.total_ns, stats.max_ns)?;
+                writeln!(
+                    batch,
+                    "{start},{end},{name},{},{},{},{}",
+                    stats.calls, stats.errors, stats.total_ns, stats.max_ns
+                )?;
             }
             self.file.write_all(&batch)?;
             self.stats.clear();
@@ -93,7 +134,11 @@ pub struct Timer {
 impl Timer {
     pub fn start(name: &'static str) -> Self {
         let start = RECORDER.with(|recorder| {
-            if recorder.borrow().is_some() { Some(Instant::now()) } else { None }
+            if recorder.borrow().is_some() {
+                Some(Instant::now())
+            } else {
+                None
+            }
         });
         Self { name, start }
     }
@@ -104,7 +149,10 @@ impl Timer {
         RECORDER.with(|recorder| {
             let mut recorder = recorder.borrow_mut();
             if let Some(active) = recorder.as_mut() {
-                if active.record(self.name, now.duration_since(start), status, now).is_err() {
+                if active
+                    .record(self.name, now.duration_since(start), status, now)
+                    .is_err()
+                {
                     // Diagnostics must not change CUDA error propagation or panic on I/O failure.
                     *recorder = None;
                 }
@@ -124,10 +172,18 @@ mod tests {
         let game = process_output_path(base.into_os_string(), 1428);
         assert_ne!(launcher, game);
         for path in [&launcher, &game] {
-            let mut file = OpenOptions::new().write(true).create_new(true).open(path).unwrap();
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(path)
+                .unwrap();
             file.write_all(b"preserve-existing-data").unwrap();
         }
-        assert!(OpenOptions::new().write(true).create_new(true).open(&launcher).is_err());
+        assert!(OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&launcher)
+            .is_err());
         assert_eq!(std::fs::read(&launcher).unwrap(), b"preserve-existing-data");
         std::fs::remove_file(launcher).unwrap();
         std::fs::remove_file(game).unwrap();
@@ -139,17 +195,39 @@ mod tests {
         stats.record(10, 0);
         stats.record(900, 1);
         stats.record(20, 0);
-        assert_eq!((stats.calls, stats.errors, stats.total_ns, stats.max_ns), (3, 1, 930, 900));
+        assert_eq!(
+            (stats.calls, stats.errors, stats.total_ns, stats.max_ns),
+            (3, 1, 930, 900)
+        );
     }
 
     #[test]
     fn window_output_separates_request_types_and_resets() {
-        let path = std::env::temp_dir().join(format!("zluda-diagnostic-test-{}.csv", std::process::id()));
-        let file = OpenOptions::new().write(true).create_new(true).open(&path).unwrap();
+        let path =
+            std::env::temp_dir().join(format!("zluda-diagnostic-test-{}.csv", std::process::id()));
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
         let origin = Instant::now();
-        let mut recorder = Recorder { file, origin, window: origin, stats: BTreeMap::new() };
-        recorder.record("copy", Duration::from_nanos(100), 0, origin).unwrap();
-        recorder.record("sync", Duration::from_nanos(900), 1, origin + Duration::from_secs(5)).unwrap();
+        let mut recorder = Recorder {
+            file,
+            origin,
+            window: origin,
+            stats: BTreeMap::new(),
+        };
+        recorder
+            .record("copy", Duration::from_nanos(100), 0, origin)
+            .unwrap();
+        recorder
+            .record(
+                "sync",
+                Duration::from_nanos(900),
+                1,
+                origin + Duration::from_secs(5),
+            )
+            .unwrap();
         let output = std::fs::read_to_string(&path).unwrap();
         assert!(output.contains("0,5000000000,copy,1,0,100,100\n"));
         assert!(output.contains("0,5000000000,sync,1,1,900,900\n"));
@@ -162,7 +240,9 @@ mod tests {
 // Shadow counters have zero duration and must not enter service-time totals.
 #[cfg(feature = "physx-texture-reuse")]
 pub fn count(name: &'static str, count: usize) {
-    if count == 0 { return; }
+    if count == 0 {
+        return;
+    }
     RECORDER.with(|recorder| {
         if let Some(recorder) = recorder.borrow_mut().as_mut() {
             recorder.stats.entry(name).or_default().calls += count as u64;

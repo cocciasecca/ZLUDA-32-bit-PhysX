@@ -1,3 +1,17 @@
+# Current work: complete native Linux transport candidate
+
+The last user-validated game configuration remains Windows server + texture deferral
+(29–30 FPS reported, later 26 FPS). No native installation has been performed.
+
+The implementation now ports the full existing server dispatcher, not the earlier
+smoke-only API subset. See tools/physx/native/README.md for architecture, build,
+preflight and rollback. Native install is gated on same-revision successful Windows
+and Linux artifacts plus an actual x86 DLL/PTX32 GPU test in an isolated test prefix.
+Do not call the package validated until those gates have passed. User requests work
+continue until DLLs and project are ready for Legion installation.
+
+## Historical notes (superseded by the status above)
+
 # Current configuration: restored texture deferral
 
 The active server sources and Cargo.lock are restored exactly from `3e9ea16`,
@@ -68,3 +82,28 @@ verified results/cleanup. Four mocked tests are automated locally and in CI; act
 Linux/GPU execution and Proton integration remain outstanding. Python is only a
 feasibility harness, not the proposed per-call transport. Recovered missing tracked
 files in the existing temporary checkout from HEAD without overwriting present files.
+
+### Native binary bridge (2026-10-23)
+
+Added tools/physx/native/bridge.rs: standalone Rust Linux server loading ZLUDA
+through dlopen and Windows-i686-compatible probe client. Versioned binary loopback
+RPC, per-run token, bounded messages/allocations, opaque allocation IDs, context
+cleanup on disconnect. Supports initialization, allocations, copies, one fixed PTX
+kernel, free and quit. run_bridge.py automates startup/authentication/shutdown and
+optionally runs the Windows probe through a specified Wine executable. Main CI
+builds/tests Linux x86-64 and Windows x86 artifacts; deployment still selects the
+established deferral backend. This is NOT the game's nvcuda.dll transport yet:
+module/texture/event/stream RPC and integration with existing dispatch remain open.
+Local transport tests pass; Linux-specific Rust code type-checked locally via
+metadata emission, not linked/run on Linux. Actual Linux/HIP and Windows/Wine GPU
+execution remain unverified. No game performance claims and no installation.
+
+### DLL native transport bootstrap
+
+`zluda32/src/native_backend.rs` now intercepts exported CUDA calls when explicitly
+selected; routes initialization/context/memory copies/alloc/free to binary Linux
+transport, rejects unsupported operations and prevents any Windows server fallback.
+Protocol shared in tools/physx/native/wire.rs. Baseline installer sets native mode OFF.
+Windows CI builds and exercises the actual DLL via native-dll-probe.exe and a fake
+peer. Real Windows build and Linux/HIP test have not been run locally. This is NOT
+ready for Batman: enumeration, module/kernel/texture/event/stream support remains.

@@ -14,11 +14,7 @@ cuda_types = { path = "../cuda_types" }
 cuda_macros = { path = "../cuda_macros" }
 zluda_server_common = { path = "../zluda_server_common" }
 dark_api = { path = "../dark_api" }
-windows = { version = "0.62.2", features = [
-    "Win32_Foundation",
-    "Win32_System_Memory",
-    "Win32_System_Threading",
-] }
+
 compio = { version = "0.18", features = ["macros", "fs"] }
 slab = "0.4.12"
 rkyv = "0.8"
@@ -38,3 +34,13 @@ physx-diagnostics = []
 
 # Experimental reuse is also gated at runtime by ZLUDA_PHYSX_TEXTURE_REUSE=1.
 physx-texture-reuse = ["physx-diagnostics", "dep:ptx_parser"]
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

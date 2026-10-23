@@ -4,30 +4,25 @@
 python3 tools/physx/push_build.py --yes --install
 ```
 
-Il comando verifica Python e diff, esegue i test Rust portabili disponibili
-(riutilizza l'esito se sorgenti e compilatore non cambiano), committa le modifiche,
-pusha e attende GitHub Actions. La CI esegue anche compilazione e test Windows.
-Installa soltanto una build riuscita, verificando revisione, hash e architettura.
-Controlla automaticamente che Batman e il server siano chiusi prima del download
-e nuovamente prima della sostituzione. Se sono aperti, si ferma senza chiuderli.
+Un comando: controlli locali, commit, push, build Windows/Linux, download verificato
+e installazione sulla Legion. Non occorre scegliere profili. Il checkout attivo resta
+`/private/tmp/zluda-physx-diagnostics`; il launcher nella cartella originale rimanda lì.
 
-Non occorre scegliere un profilo: la configurazione corrente ripristina il rinvio delle distruzioni di `3e9ea16`,
-con riuso attraverso i trasferimenti, cache e diagnostica originali attivi.
-Il pool e le sue sonde sono rimossi. I vecchi pacchetti sono rifiutati.
-Le opzioni storiche `--profile` non sono più necessarie né accettate.
+La configurazione corrente è il backend Linux con rinvio delle distruzioni e cache
+attivi. La prima build Linux compila anche LLVM e può richiedere parecchio tempo;
+le successive riutilizzano la cache. Il server Windows viene conservato per ripristino.
 
-Per riprendere soltanto un'installazione interrotta (per esempio gioco aperto):
+L'installer controlla sempre che Batman e i server siano chiusi. Prima di attivare il
+nuovo percorso esegue la DLL a 32 bit e un kernel PTX sul backend Linux in un prefix di
+prova separato. Se il test fallisce, la configurazione funzionante resta intatta.
+Non vengono cambiati HIP/COMGR, il prefix del gioco o i salvataggi.
+
+Per riprendere soltanto l'installazione di una build già riuscita:
 
 ```sh
 python3 tools/physx/push_build.py --install-run NUMERO_RUN
 ```
 
-Il checkout attivo esistente è `/private/tmp/zluda-physx-diagnostics`, ramo
-`experiment/physx-diagnostics`. Il launcher nella cartella originale lo trova
-automaticamente: non crea altri checkout. Modificare il codice nel checkout
-attivo; il vecchio master è soltanto la reference storica, non una seconda versione
-da aggiornare. Prima di commit vengono elencate tutte le modifiche incluse.
-
-Senza Rust locale i controlli Python/diff vengono comunque eseguiti e i test Rust
-restano obbligatori in CI. Nessun risultato locale sostituisce i test Windows.
-Il confronto prestazionale della configurazione ripristinata resta da fare sulla GPU.
+Il pacchetto deve contenere DLL e backend Linux della stessa revisione. Vecchi artifact
+di esperimenti diversi vengono rifiutati. La directory diagnostics contiene gli errori
+del preflight. Dopo un'installazione riuscita viene stampato il comando di rollback.

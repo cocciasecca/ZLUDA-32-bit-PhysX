@@ -1,26 +1,55 @@
-# Linux native backend feasibility: first step
+# Native Linux PhysX backend
 
-This is an isolated native CUDA ABI smoke test, not a Proton bridge or a performance
-prototype. It explicitly loads the supplied Linux ZLUDA library in a child process,
-creates a context, allocates four bytes, loads a PTX increment kernel, copies data,
-launches twice, checks 42/100 and releases resources. Nonzero CUDA status, wrong output,
-child crashes and timeouts fail the command. It does not install or modify anything.
+The current code routes the existing Windows 32-bit nvcuda.dll wire protocol to a
+Linux x86-64 `zluda64_server`, using the same CUDA dispatcher as the working Windows
+server. Module loading, PTX32 argument handling, textures, streams, events, allocation
+translation, range caching and texture-destruction deferral retain their existing
+implementations. The old limited smoke-only RPC/DLL implementation has been removed.
+This preserves the existing PhysX API coverage; it is not a claim to implement all CUDA.
 
-On Linux x86-64, with a built ZLUDA shared library and its HIP/ROCm dependencies:
+Messages use versioned binary framing over loopback TCP, per-launch authentication,
+matching Git revisions, monotonically increasing sequence numbers and a 256 MiB
+payload limit. Buffers preserve the previous wire alignment and serialization layout.
+Each DLL connection gets its own Linux process/context and allocation arena. No Windows
+CUDA server is started in native mode. The native library is loaded by absolute path.
+Host-to-device asynchronous copies explicitly finish before the receive buffer can be
+reused, preventing lifetime errors; this initial port does not promise less overhead.
+
+## Build and installation
+
+Use the existing `tools/physx/push_build.py --yes --install` command. Actions builds:
+
+- Matching Windows x86 DLL and probe, plus the Windows servers kept for fallback.
+- Full Linux ZLUDA and server with texture deferral enabled, using ROCm 7.2.4 build
+  dependencies. No HIP source or target-machine HIP installation is modified.
+
+The first native build includes LLVM and can be substantially slower; LLVM build
+outputs are cached for subsequent runs. There is one current install configuration.
+
+Deployment downloads both artifacts from the same successful run. The installer checks
+hashes/revisions and game/server closure, then runs the actual x86 DLL through the
+existing Proton executable in a **separate test compatdata directory**. The test checks
+copies and a PTX32 kernel on Linux ZLUDA. Missing libraries, errors or a timeout abort
+before changing the working installation. The GPU test is not a Batman performance test.
+
+Only after this preflight does installation activate a Proton wrapper. It starts the
+Linux supervisor, passes ephemeral connection credentials to the DLL and terminates
+all native workers when Proton exits. Existing native HIP/COMGR libraries and game
+prefix/saves are preserved. Native logs go to `diagnostics/native-*.log` and `.csv`.
+
+A backup and transaction manifest support rollback:
 
 ```sh
-python3 tools/physx/native/smoke.py --library /absolute/path/to/libnvcuda.so
+python3 ~/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/native/rollback_native.py
 ```
 
-Use the actual built ZLUDA library path (a distribution may name it `libcuda.so`).
-Library dependencies must already be available to the dynamic loader. This command
-does not install ROCm or replace the working game backend.
+Rollback also checks that Batman/server are closed and refuses to overwrite edits made
+after installation. It restores the previous DLLs, settings and Proton launcher.
 
-Local/CI tests use a fake CUDA API to test orchestration, errors and cleanup. They do
-not validate PTX compilation, the real CUDA ABI on GPU, or driver compatibility.
+## Verification boundaries
 
-Next steps after a successful native GPU run: define a versioned binary IPC protocol
-with opaque server-owned handles; implement the corresponding Windows 32-bit client;
-port server dispatch and allocation mapping. Existing IPC uses Windows handles/events
-and cannot simply be attached to this process. The production transport must not use
-Python/JSON per CUDA call. Preserve the current texture-deferral baseline throughout.
+Portable tests cover framing, transport, aligned buffer growth, configuration,
+process lifetime, failed preflight, activation and rollback. Windows CI additionally
+loads the actual DLL against a simulated peer using the real CUDA wire structs.
+Linux CI compiles the full backend. Installation requires the real GPU kernel test.
+None of these establishes a Batman FPS gain or absence of game-specific bugs.

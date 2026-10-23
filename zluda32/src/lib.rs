@@ -15,6 +15,7 @@ use zluda_common::{CodeLibraryRef, CodeModuleRef};
 use zluda_server_common::*;
 
 mod ipc;
+mod native_backend;
 mod range_cache;
 
 macro_rules! not_implemented {
