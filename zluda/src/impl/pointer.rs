@@ -93,7 +93,7 @@ mod tests {
     use crate::tests::CudaApi;
     use cuda_macros::test_cuda;
     use cuda_types::cuda::*;
-    use std::{ffi::c_void, i32, mem, ptr, usize};
+    use std::{ffi::c_void, mem, ptr};
 
     #[test_cuda]
     pub unsafe fn unknown_ptr_attribute(api: impl CudaApi) {
