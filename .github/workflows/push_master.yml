@@ -49,15 +49,14 @@ jobs:
           key: native-llvm-${{ runner.os }}-${{ steps.native-cache.outputs.rust }}-${{ steps.native-cache.outputs.llvm }}-${{ hashFiles('llvm_zluda/build.rs', 'llvm_zluda/Cargo.toml') }}
       - name: Test native wire buffers and framing
         run: cargo test --locked --release -p zluda_server_common --lib
-      - name: Build LLVM independently
-        run: cargo build --locked --release -p llvm_zluda
+      - name: Build ZLUDA and full native PhysX server
+        id: native-build
+        run: cargo build --locked --release -p zluda -p zluda64_server --features zluda64_server/physx-texture-reuse
       - uses: actions/cache/save@v4
-        if: steps.llvm-cache.outputs.cache-hit != 'true'
+        if: ${{ !cancelled() && steps.native-build.outcome != 'skipped' && steps.llvm-cache.outputs.cache-hit != 'true' }}
         with:
           path: target/release/build/llvm_zluda-*
           key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
-      - name: Build ZLUDA and full native PhysX server
-        run: cargo build --locked --release -p zluda -p zluda64_server --features zluda64_server/physx-texture-reuse
       - name: Package native backend
         run: python3 tools/physx/native/package_native.py --output native-artifacts --revision "$GITHUB_SHA"
       - uses: actions/upload-artifact@v4
