@@ -42,12 +42,20 @@ jobs:
         run: |
           echo "llvm=$(git -C ext/llvm-project rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "rust=$(rustc --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: llvm-cache
         with:
           path: target/release/build/llvm_zluda-*
           key: native-llvm-${{ runner.os }}-${{ steps.native-cache.outputs.rust }}-${{ steps.native-cache.outputs.llvm }}-${{ hashFiles('llvm_zluda/build.rs', 'llvm_zluda/Cargo.toml') }}
       - name: Test native wire buffers and framing
         run: cargo test --locked --release -p zluda_server_common --lib
+      - name: Build LLVM independently
+        run: cargo build --locked --release -p llvm_zluda
+      - uses: actions/cache/save@v4
+        if: steps.llvm-cache.outputs.cache-hit != 'true'
+        with:
+          path: target/release/build/llvm_zluda-*
+          key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
       - name: Build ZLUDA and full native PhysX server
         run: cargo build --locked --release -p zluda -p zluda64_server --features zluda64_server/physx-texture-reuse
       - name: Package native backend
