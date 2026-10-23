@@ -58,3 +58,13 @@ Local combined pool capture ready, six local tests passed; user owns push/build/
 Combined capture COMPLETE d8bf7d4: user21FPS;50029 binds,41distinctkeys,zero errors/unknown/nonzero offsets/resets. LRU64/12899.918% optimistic hits;32slots97.587%;8/16zero. Ring18texrefs, flags set whilebound (knownunchanged). Proceed toward opt-in pool prototype with native fallback; do not claim measured speedup or safe ownership yet. See measurements/pool-combined-2026-10-21.
 
 Local prototype texture-pool implemented,64objects, native fallback, lifetime drains, preserved sync, host never owns pooled objects.10 portable ownership/control-flow tests passed; production Windows/GPU unverified. Profile texture-pool; user owns push/build/install. See TEXTURE_POOL_PROTOTYPE.md.
+
+## 2026-10-23: Linux backend feasibility
+
+User accepts restored deferral as the baseline (reported 29–30 FPS, initial particle
+stutter remains). No runtime setting changed. Added tools/physx/native smoke harness:
+explicit native library, separate process, context/allocation/copies/PTX kernel/two
+verified results/cleanup. Four mocked tests are automated locally and in CI; actual
+Linux/GPU execution and Proton integration remain outstanding. Python is only a
+feasibility harness, not the proposed per-call transport. Recovered missing tracked
+files in the existing temporary checkout from HEAD without overwriting present files.

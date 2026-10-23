@@ -202,6 +202,8 @@ jobs:
         with:
           toolchain: stable
           target: x86_64-pc-windows-msvc,i686-pc-windows-msvc
+      - name: Test native Linux smoke harness
+        run: python -B -m unittest discover -s tools/physx/native -p "test_*.py"
       - name: Test portable diagnostic aggregation
         shell: pwsh
         run: |

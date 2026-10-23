@@ -15,6 +15,8 @@ def main():
     scripts = sorted((root/'tools/physx').glob('*.py'))
     for script in scripts:
         ast.parse(script.read_text(), filename=str(script))
+    subprocess.run([sys.executable, '-B', '-m', 'unittest', 'discover',
+                    '-s', str(root/'tools/physx/native'), '-p', 'test_*.py'], check=True)
     rustc = shutil.which('rustc')
     if not rustc:
         portable = Path('/private/tmp/zluda-rust-toolchain/bin/rustc')
