@@ -69,7 +69,7 @@ def deploy(run_id, host='deck@192.168.10.67', key=None, profile='native-linux'):
         if not re.fullmatch(r'/home/deck/zluda-install-[A-Za-z0-9]+', remote):
             raise RuntimeError('Directory remota inattesa')
         subprocess.run(['scp', *options, '-r', str(payload), str(Path(__file__).with_name('legion_install.py')), f'{host}:{remote}/'], check=True)
-        print(run('ssh', *options, host, 'python3 '+shlex.quote(remote+'/legion_install.py')+' '+run_id+' '+shlex.quote(sha)+' '+shlex.quote(profile)))
+        subprocess.run(['ssh', *options, host, 'python3 -u '+shlex.quote(remote+'/legion_install.py')+' '+run_id+' '+shlex.quote(sha)+' '+shlex.quote(profile)], check=True)
         print('Legion aggiornata. Backup nella copia sperimentale; puoi avviare Batman.')
 
 

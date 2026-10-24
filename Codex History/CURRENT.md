@@ -1,14 +1,20 @@
-# Current work: complete native Linux transport candidate
+# Current work: shared-RAM transport prototype
 
-The last user-validated game configuration remains Windows server + texture deferral
-(29–30 FPS reported, later 26 FPS). No native installation has been performed.
+Native build 40020496411 (6c66f57) passed DLL copies and a PTX32 GPU kernel on Legion.
+The initial Proton test launcher hung; installer now uses runinprefix, captures the
+explicit kernel result, cleans only the test prefix and streams progress. User then
+reported about 10 FPS on native TCP, a regression versus the earlier 26–30 Windows
+baseline. No causal attribution to transport alone has been established.
 
-The implementation now ports the full existing server dispatcher, not the earlier
-smoke-only API subset. See tools/physx/native/README.md for architecture, build,
-preflight and rollback. Native install is gated on same-revision successful Windows
-and Linux artifacts plus an actual x86 DLL/PTX32 GPU test in an isolated test prefix.
-Do not call the package validated until those gates have passed. User requests work
-continue until DLLs and project are ready for Legion installation.
+Current unbuilt candidate replaces ordinary socket payloads with an 8 MiB shared
+mapping per connection under /dev/shm. A one-byte socket notification transfers slot
+ownership without polling/spinning. Oversized messages retain framed TCP fallback.
+Authentication/revision checks, CUDA dispatch and GPU synchronization remain intact.
+Copies into/out of the slot remain; this is not a fully zero-copy implementation.
+
+User owns push/build/install through tools/physx/push_build.py. Do not poll GitHub;
+wait for their completion report. A new matching DLL/server build is required.
+No shared-memory game performance measurement or installation has happened yet.
 
 ## Historical notes (superseded by the status above)
 

@@ -9,6 +9,7 @@ import signal
 import subprocess
 import sys
 import threading
+import tempfile
 import uuid
 
 
@@ -37,6 +38,7 @@ class ServerSession:
         self.root, self.native = Path(root), Path(native)
         self.process = None
         self.log = None
+        self.shared_directory = None
 
     def __enter__(self):
         self.env = environment(self.root, self.native)
@@ -47,6 +49,8 @@ class ServerSession:
         self.env['ZLUDA_PHYSX_DIAGNOSTICS'] = str(logs/f'native-{identifier}.csv')
         self.log = (logs/f'native-{identifier}.log').open('w')
         try:
+            self.shared_directory = tempfile.TemporaryDirectory(prefix='zluda-shm-', dir='/dev/shm' if sys.platform == 'linux' else None)
+            self.env['ZLUDA_NATIVE_SHM_DIR'] = self.shared_directory.name
             self.process = subprocess.Popen([str(self.native/'zluda64_server'), '--listen', '127.0.0.1:0'],
                 env=self.env, stdout=subprocess.PIPE, stderr=self.log, text=True, start_new_session=True)
             startup = queue.Queue()
@@ -80,6 +84,8 @@ class ServerSession:
                 self.process.stdout.close()
         if self.log:
             self.log.close()
+        if self.shared_directory:
+            self.shared_directory.cleanup()
 
     def __exit__(self, *args):
         self.close()
@@ -90,30 +96,7 @@ def base_proton(root):
     return path if path.exists() else root/'proton'
 
 
-def preflight(root, native, payload32):
-    """Use a separate compatdata directory; never touch Batman's prefix or saves."""
-    root, native, payload32 = Path(root), Path(native), Path(payload32)
-    env = environment(root, native)
-    for binary in (native/'zluda64_server', native/'libnvcuda.so'):
-        result = subprocess.run(['ldd', str(binary)], env=env, text=True, capture_output=True, check=True)
-        if 'not found' in result.stdout:
-            raise RuntimeError('Dipendenze Linux mancanti:\n' + result.stdout)
-    with ServerSession(root, native) as server:
-        env = dict(server.env)
-        env['STEAM_COMPAT_DATA_PATH'] = str(root/'native-smoke-compatdata')
-        env['STEAM_COMPAT_CLIENT_INSTALL_PATH'] = str(root.parents[1])
-        env['SteamAppId'] = env['SteamGameId'] = env['STEAM_COMPAT_APP_ID'] = '0'
-        env['ZLUDA_NATIVE_DLL'] = 'Z:' + str(payload32/'nvcuda.dll').replace('/', '\\')
-        env['ZLUDA_PROBE_GPU'] = '1'
-        env['WINEDLLOVERRIDES'] = 'nvcuda=n'
-        log_path = root/'diagnostics/native-preflight.log'
-        with log_path.open('w') as log:
-            result = subprocess.run([sys.executable, str(base_proton(root)), 'run',
-                str(payload32/'native-dll-probe.exe'), 'probe', env['ZLUDA_NATIVE_ADDR']],
-                env=env, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=300)
-        if result.returncode != 0:
-            tail = log_path.read_text(errors='replace')[-6000:]
-            raise RuntimeError('Prova DLL Windows → ZLUDA Linux fallita; installazione non attivata.\n' + tail)
+# Install-time GPU preflight is implemented in legion_install.py.
 
 
 def run_proton(root, args):
@@ -130,6 +113,7 @@ def run_proton(root, args):
         env = dict(os.environ)
         for name in ('ZLUDA_NATIVE_ADDR', 'ZLUDA_NATIVE_TOKEN', 'ZLUDA_NATIVE_BACKEND'):
             env[name] = server.env[name]
+        env['ZLUDA_NATIVE_SHM_DIR'] = 'Z:' + server.env['ZLUDA_NATIVE_SHM_DIR'].replace('/', '\\')
         process = subprocess.Popen(command, env=env)
         previous = signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(SystemExit(143)))
         try:

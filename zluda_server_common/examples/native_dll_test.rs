@@ -13,6 +13,9 @@ fn main() -> io::Result<()> {
     if args.len() != 3 {
         return Err(io::Error::other("Usage: native_dll_test DLL PROBE"));
     }
+    let shm_directory = std::env::temp_dir().join(format!("zluda-dll-shm-{}", std::process::id()));
+    std::fs::create_dir(&shm_directory)?;
+    std::env::set_var("ZLUDA_NATIVE_SHM_DIR", &shm_directory);
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let address = listener.local_addr()?.to_string();
     let token = "1122334455667788990011223344556677889900112233445566778899001122";
@@ -42,6 +45,7 @@ fn main() -> io::Result<()> {
         // The test's own build script is absent; DLL revision is supplied by CI.
         let sha = std::env::var("ZLUDA_TEST_SHA").map_err(io::Error::other)?;
         connection.authenticate_server(token, &sha)?;
+        assert!(connection.uses_shared_memory());
         connection.send(Opcode::Startup as u32, sha.as_bytes())?;
         let mut request = message_buffer::MessageBuffer::new();
         let mut response = message_buffer::MessageBuffer::new();
@@ -122,6 +126,7 @@ fn main() -> io::Result<()> {
         let _ = child.kill();
     }
     let status = child.wait()?;
+    std::fs::remove_dir_all(shm_directory)?;
     result?;
     if !status.success() {
         return Err(io::Error::other("DLL probe failed"));

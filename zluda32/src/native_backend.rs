@@ -42,6 +42,9 @@ impl Client {
         {
             return Err(std::io::Error::other("Native server revision mismatch"));
         }
+        if std::env::var_os("ZLUDA_NATIVE_SHM_DIR").is_some() && !connection.uses_shared_memory() {
+            return Err(std::io::Error::other("Shared-memory negotiation failed"));
+        }
         Ok(Self {
             connection,
             request: MessageBuffer::new(),

@@ -33,6 +33,7 @@ def main():
     for source in sources:
         digest.update(str(source).encode())
         digest.update(source.read_bytes())
+    digest.update((root/'zluda_server_common/src/native_mapping.rs').read_bytes())
     cache = Path(tempfile.gettempdir())/'zluda-local-checks'
     cache.mkdir(exist_ok=True)
     marker = cache/digest.hexdigest()

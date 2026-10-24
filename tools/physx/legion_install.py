@@ -43,6 +43,80 @@ def restore_files(root, backup, records):
             shutil.copy2(backup/relative, target)
 
 
+def gpu_preflight(runtime, root, native, payload32):
+    """Own the install-time probe here so existing binary artifacts remain usable."""
+    env = runtime.environment(root, native)
+    if not env.get('DISPLAY'):
+        # SSH does not inherit Steam's display. Copy only display-related values
+        # from a Steam process owned by this user, never its full environment.
+        for process in Path('/proc').glob('[0-9]*'):
+            try:
+                if process.stat().st_uid != os.getuid() or (process/'comm').read_text().strip() != 'steam':
+                    continue
+                values = dict(item.split(b'=', 1) for item in (process/'environ').read_bytes().split(b'\0') if b'=' in item)
+                for name in ('DISPLAY', 'XAUTHORITY', 'XDG_RUNTIME_DIR', 'WAYLAND_DISPLAY'):
+                    value = values.get(name.encode())
+                    if value:
+                        env[name] = os.fsdecode(value)
+                if env.get('DISPLAY'):
+                    break
+            except (OSError, ValueError):
+                continue
+    compatdata = root/'native-smoke-compatdata'
+    compatdata.mkdir(exist_ok=True)
+    env.update(STEAM_COMPAT_DATA_PATH=str(compatdata),
+        STEAM_COMPAT_CLIENT_INSTALL_PATH=str(root.parents[1]),
+        SteamAppId='0', SteamGameId='0', STEAM_COMPAT_APP_ID='0',
+        ZLUDA_NATIVE_DLL='Z:' + str(payload32/'nvcuda.dll').replace('/', '\\'),
+        ZLUDA_PROBE_GPU='1', WINEDLLOVERRIDES='nvcuda=n', PROTON_LOG='0')
+    for name in ('PROTON_FSR4_UPGRADE', 'PROTON_DLSS_UPGRADE', 'PROTON_XESS_UPGRADE',
+                 'PROTON_FFX3_UPGRADE', 'PROTON_FFX4_UPGRADE', 'PROTON_USE_OPTISCALER'):
+        env[name] = '0'
+    for binary in (native/'zluda64_server', native/'libnvcuda.so'):
+        result = subprocess.run(['ldd', str(binary)], env=env, text=True, capture_output=True, check=True)
+        if 'not found' in result.stdout:
+            raise RuntimeError('Dipendenze Linux mancanti:\n' + result.stdout)
+    logs = root/'diagnostics'
+    logs.mkdir(exist_ok=True)
+    log_path = logs/'native-preflight.log'
+    proton = [sys.executable, str(runtime.base_proton(root))]
+    cleanup_env = dict(env, WINEPREFIX=str(compatdata/'pfx'))
+    def cleanup():
+        result = subprocess.run([str(root/'files/bin/wineserver'), '-k'], env=cleanup_env,
+            stdin=subprocess.DEVNULL, capture_output=True, timeout=15)
+        # wineserver returns 1 without output when this prefix has no server.
+        if result.returncode != 0 and not (result.returncode == 1 and not result.stderr):
+            raise RuntimeError('Pulizia prefix di prova fallita: ' + result.stderr.decode(errors='replace'))
+    # Stop only this isolated prefix, including leftovers from an earlier timeout.
+    cleanup()
+    try:
+        with log_path.open('w') as log:
+            print('Preparazione prefix di prova Proton...', flush=True)
+            subprocess.run([*proton, 'getcompatpath', str(root)], env=env, cwd=root,
+                stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, timeout=120, check=True)
+            with runtime.ServerSession(root, native) as server:
+                for name in ('ZLUDA_NATIVE_ADDR', 'ZLUDA_NATIVE_TOKEN', 'ZLUDA_NATIVE_BACKEND'):
+                    env[name] = server.env[name]
+                if 'ZLUDA_NATIVE_SHM_DIR' in server.env:
+                    env['ZLUDA_NATIVE_SHM_DIR'] = 'Z:' + server.env['ZLUDA_NATIVE_SHM_DIR'].replace('/', '\\')
+                print('Prova diretta DLL, copie e kernel PTX32...', flush=True)
+                subprocess.run([*proton, 'runinprefix', str(payload32/'native-dll-probe.exe'),
+                    'probe', env['ZLUDA_NATIVE_ADDR']], env=env, cwd=root,
+                    stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, timeout=120, check=True)
+        require_kernel_result(log_path.read_text(errors='replace'))
+    except (subprocess.SubprocessError, RuntimeError) as error:
+        tail = log_path.read_text(errors='replace')[-6000:]
+        raise RuntimeError('Preflight fallito; installazione non attivata.\n' + tail) from error
+    finally:
+        cleanup()
+    print('Kernel GPU verificato: 100 → 101.', flush=True)
+
+
+def require_kernel_result(output):
+    if 'Actual DLL -> Linux ZLUDA -> PTX32 kernel verified: 100 -> 101' not in output:
+        raise RuntimeError('Manca la conferma del kernel: il solo codice di uscita non basta.')
+
+
 def main():
     run_id, revision = sys.argv[1:3]
     if not run_id.isdecimal() or len(revision) != 40 or any(c not in '0123456789abcdef' for c in revision):
@@ -95,7 +169,10 @@ def main():
         runtime = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(runtime)
         print('Verifica DLL a 32 bit, copie e kernel PTX su ZLUDA Linux; prefix di prova separato.', flush=True)
-        runtime.preflight(root, stage/'native', payload/'32')
+        # Proton opens pfx.lock before creating the prefix itself.
+        # Prepare its parent here, including when deploying older built runtimes.
+        (root/'native-smoke-compatdata').mkdir(exist_ok=True)
+        gpu_preflight(runtime, root, stage/'native', payload/'32')
         closed()
         backup = root/f'update-backup-{run_id}-native-{uuid.uuid4().hex[:8]}'
         backup.mkdir()

@@ -34,7 +34,11 @@ class LifecycleTests(unittest.TestCase):
                 self.assertEqual(session.env['ZLUDA_NATIVE_ADDR'], '127.0.0.1:12345')
                 self.assertEqual(len(session.env['ZLUDA_NATIVE_TOKEN']), 64)
                 self.assertIsNone(session.process.poll())
+                shared = Path(session.env['ZLUDA_NATIVE_SHM_DIR'])
+                self.assertTrue(shared.is_dir())
+                self.assertEqual(shared.stat().st_mode & 0o777, 0o700)
             self.assertIsNotNone(session.process.poll())
+            self.assertFalse(shared.exists())
 
     def test_bad_startup_reaps_process(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -43,12 +47,13 @@ class LifecycleTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Avvio server Linux fallito'):
                 session.__enter__()
             self.assertIsNotNone(session.process.poll())
+            self.assertFalse(Path(session.env['ZLUDA_NATIVE_SHM_DIR']).exists())
 
     def test_wrapper_preserves_proton_exit_code(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             self.fake(root)
-            (root/'proton.base').write_text('import os, sys\nassert os.environ["ZLUDA_NATIVE_BACKEND"] == "1"\nsys.exit(7)\n')
+            (root/'proton.base').write_text('import os, sys\nassert os.environ["ZLUDA_NATIVE_BACKEND"] == "1"\nassert os.environ["ZLUDA_NATIVE_SHM_DIR"].startswith("Z:")\nsys.exit(7)\n')
             self.assertEqual(run_proton(root, ['run']), 7)
 
 

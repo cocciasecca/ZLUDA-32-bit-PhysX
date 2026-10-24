@@ -65,7 +65,8 @@ class InstallationTests(unittest.TestCase):
         return root, initial, prefix
 
     def install(self, base, root):
-        with patch.object(installer, 'ROOT', root), patch.object(installer, '__file__', str(base/'legion_install.py')), \
+        with patch.object(installer, 'gpu_preflight', side_effect=lambda runtime, *args: runtime.preflight(*args)), \
+             patch.object(installer, 'ROOT', root), patch.object(installer, '__file__', str(base/'legion_install.py')), \
              patch.object(sys, 'argv', ['installer', '123', 'a'*40, 'native-linux']), \
              patch.object(installer.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1)):
             installer.main()
@@ -121,3 +122,12 @@ class InstallationTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class KernelResultTests(unittest.TestCase):
+    def test_clean_exit_without_kernel_proof_is_rejected(self):
+        for output in ('', 'Windows DLL -> native server -> DLL: 100'):
+            with self.assertRaisesRegex(RuntimeError, 'Manca la conferma'):
+                installer.require_kernel_result(output)
+
+    def test_expected_kernel_result_is_required(self):
+        installer.require_kernel_result('Actual DLL -> Linux ZLUDA -> PTX32 kernel verified: 100 -> 101\n')

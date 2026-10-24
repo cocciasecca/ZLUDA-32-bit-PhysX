@@ -2,6 +2,10 @@
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
+#[path = "native_mapping.rs"]
+mod native_mapping;
+use native_mapping::Mapping;
+const SHM_OFFER: u32 = u32::MAX - 2;
 pub const MAX_PAYLOAD: usize = 256 * 1024 * 1024;
 const MAGIC: &[u8; 8] = b"ZLUDARP1";
 pub const AUTH: u32 = u32::MAX - 1;
@@ -51,6 +55,7 @@ pub struct Connection {
     stream: TcpStream,
     sequence: u64,
     broken: bool,
+    mapping: Option<Mapping>,
 }
 impl Connection {
     pub fn new(stream: TcpStream) -> io::Result<Self> {
@@ -61,10 +66,20 @@ impl Connection {
             stream,
             sequence: 0,
             broken: false,
+            mapping: None,
         })
     }
+    pub fn uses_shared_memory(&self) -> bool { self.mapping.is_some() }
     pub fn authenticate_client(&mut self, token: &str, revision: &str) -> io::Result<Frame> {
         self.send(AUTH, format!("{token}\n{revision}").as_bytes())?;
+        let first = self.receive_same()?;
+        if first.header != SHM_OFFER { return Ok(first); }
+        let directory = std::env::var_os("ZLUDA_NATIVE_SHM_DIR")
+            .ok_or_else(|| invalid("Shared-memory directory missing"))?;
+        let name = std::str::from_utf8(&first.body).map_err(|_| invalid("Invalid shared-memory offer"))?;
+        let mapping = Mapping::open(std::path::Path::new(&directory), name)?;
+        self.send(SHM_OFFER, b"ready")?;
+        self.mapping = Some(mapping);
         self.receive_same()
     }
     pub fn authenticate_server(&mut self, token: &str, revision: &str) -> io::Result<()> {
@@ -72,18 +87,31 @@ impl Connection {
         if frame.header != AUTH || frame.body != format!("{token}\n{revision}").as_bytes() {
             return Err(invalid("Authentication/revision mismatch"));
         }
+        if let Some(directory) = std::env::var_os("ZLUDA_NATIVE_SHM_DIR") {
+            let (mapping, name) = Mapping::create(std::path::Path::new(&directory))?;
+            self.send(SHM_OFFER, name.as_bytes())?;
+            let ack = self.receive_same()?;
+            if ack.header != SHM_OFFER || ack.body != b"ready" {
+                return Err(invalid("Shared-memory acknowledgement missing"));
+            }
+            self.mapping = Some(mapping);
+        }
         Ok(())
     }
     pub fn send(&mut self, header: u32, body: &[u8]) -> io::Result<()> {
         if self.broken {
             return Err(invalid("Disconnected native server"));
         }
-        let result = Frame {
-            header,
-            sequence: self.sequence,
-            body: body.to_vec(),
-        }
-        .write(&mut self.stream);
+        let result = (|| {
+            if let Some(mapping) = &mut self.mapping {
+                if body.len() <= native_mapping::CAPACITY - 16 {
+                    mapping.write(header, self.sequence, body);
+                    return self.stream.write_all(&[1]);
+                }
+                self.stream.write_all(&[0])?;
+            }
+            Frame { header, sequence: self.sequence, body: body.to_vec() }.write(&mut self.stream)
+        })();
         if result.is_err() {
             self.broken = true;
         }
@@ -93,7 +121,21 @@ impl Connection {
         if self.broken {
             return Err(invalid("Disconnected native server"));
         }
-        let result = Frame::read(&mut self.stream).and_then(|frame| {
+        let result = (|| {
+            if let Some(mapping) = &self.mapping {
+                let mut tag = [0];
+                self.stream.read_exact(&mut tag)?;
+                match tag[0] {
+                    1 => {
+                        let (header, sequence, body) = mapping.read()?;
+                        return Ok(Frame { header, sequence, body });
+                    }
+                    0 => (),
+                    _ => return Err(invalid("Invalid shared-memory notification")),
+                }
+            }
+            Frame::read(&mut self.stream)
+        })().and_then(|frame| {
             if frame.sequence != self.sequence {
                 Err(invalid("CUDA sequence mismatch"))
             } else {
@@ -141,6 +183,34 @@ mod tests {
         assert_eq!(r.header, 17);
         bytes[12..16].copy_from_slice(&((MAX_PAYLOAD + 1) as u32).to_le_bytes());
         assert!(Frame::read(&mut bytes.as_slice()).is_err());
+    }
+    #[test]
+    fn shared_slot_roundtrip_and_oversized_fallback() {
+        let dir = std::env::temp_dir().join(format!("zluda-shm-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (server_map, name) = Mapping::create(&dir).unwrap();
+        let client_map = Mapping::open(&dir, &name).unwrap();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let sizes = [0, 64, 1024 * 1024 + 17, native_mapping::CAPACITY + 1, 32];
+        let server = std::thread::spawn(move || {
+            let mut c = Connection::new(listener.accept().unwrap().0).unwrap();
+            c.mapping = Some(server_map);
+            for size in sizes {
+                let request = c.receive_request().unwrap();
+                assert_eq!(request.body.len(), size);
+                assert!(request.body.iter().all(|b| *b == 37));
+                c.send(0, &request.body).unwrap();
+            }
+        });
+        let mut c = Connection::new(TcpStream::connect(address).unwrap()).unwrap();
+        c.mapping = Some(client_map);
+        for size in sizes {
+            assert_eq!(c.exchange(7, &vec![37; size]).unwrap().body, vec![37; size]);
+        }
+        server.join().unwrap();
+        drop(c);
+        std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]
     fn authenticated_exchange() {

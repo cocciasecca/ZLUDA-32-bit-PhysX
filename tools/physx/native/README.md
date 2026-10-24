@@ -7,7 +7,14 @@ translation, range caching and texture-destruction deferral retain their existin
 implementations. The old limited smoke-only RPC/DLL implementation has been removed.
 This preserves the existing PhysX API coverage; it is not a claim to implement all CUDA.
 
-Messages use versioned binary framing over loopback TCP, per-launch authentication,
+Messages use an 8 MiB shared mapping per connection, backed by the private session
+directory under `/dev/shm` on Linux (RAM). Windows maps the same file through Wine's
+Z: drive using CreateFileMapping; Linux uses mmap(MAP_SHARED). A one-byte socket
+notification transfers ownership of the slot; there is no busy-wait loop. Oversized
+messages fall back to framed TCP. This removes socket payload transfers for ordinary
+messages, but serialization and copies into/out of the mapping remain.
+
+The handshake uses loopback TCP, per-launch authentication,
 matching Git revisions, monotonically increasing sequence numbers and a 256 MiB
 payload limit. Buffers preserve the previous wire alignment and serialization layout.
 Each DLL connection gets its own Linux process/context and allocation arena. No Windows
@@ -28,7 +35,11 @@ outputs are cached for subsequent runs. There is one current install configurati
 
 Deployment downloads both artifacts from the same successful run. The installer checks
 hashes/revisions and game/server closure, then runs the actual x86 DLL through the
-existing Proton executable in a **separate test compatdata directory**. The test checks
+existing Proton executable in a **separate test compatdata directory**. Prefix setup
+uses getcompatpath; the probe uses runinprefix directly, with stdin closed and Proton
+logging disabled so its output is captured. The installer requires the explicit GPU
+result, not just an exit code, and stops only the test prefix's wineserver before/after
+the probe. Progress is streamed to the terminal. The test checks
 copies and a PTX32 kernel on Linux ZLUDA. Missing libraries, errors or a timeout abort
 before changing the working installation. The GPU test is not a Batman performance test.
 
@@ -53,3 +64,10 @@ process lifetime, failed preflight, activation and rollback. Windows CI addition
 loads the actual DLL against a simulated peer using the real CUDA wire structs.
 Linux CI compiles the full backend. Installation requires the real GPU kernel test.
 None of these establishes a Batman FPS gain or absence of game-specific bugs.
+
+## Measured baseline
+
+The first native TCP build passed the GPU smoke test but the user reported about
+10 FPS in Batman, versus 26–30 on the earlier Windows path. Shared-memory performance
+is not yet measured. GPU synchronization behavior is deliberately unchanged for this
+transport experiment. The Windows rollback remains available.

@@ -8,8 +8,9 @@ Un comando: controlli locali, commit, push, build Windows/Linux, download verifi
 e installazione sulla Legion. Non occorre scegliere profili. Il checkout attivo resta
 `/private/tmp/zluda-physx-diagnostics`; il launcher nella cartella originale rimanda lì.
 
-La configurazione corrente è il backend Linux con rinvio delle distruzioni e cache
-attivi. La prima build Linux compila anche LLVM e può richiedere parecchio tempo;
+La configurazione corrente è il backend Linux con trasporto in RAM condivisa,
+rinvio delle distruzioni e cache attivi. Serve una nuova build per questa modifica;
+il vecchio run 40020496411 contiene ancora il trasporto TCP. La prima build Linux compila anche LLVM e può richiedere parecchio tempo;
 le successive riutilizzano la cache. Il server Windows viene conservato per ripristino.
 
 L'installer controlla sempre che Batman e i server siano chiusi. Prima di attivare il
