@@ -1,6 +1,8 @@
 // Prevent the console window from appearing when running the server on Windows
 #![windows_subsystem = "windows"]
 
+mod launch_params;
+
 #[cfg(feature = "physx-diagnostics")]
 mod diagnostics;
 #[cfg(feature = "physx-texture-reuse")]
@@ -46,6 +48,7 @@ struct State {
     handles: HandlePool,
     devmemory: Allocator,
     modules: ModuleLaunchData,
+    launch_params: launch_params::LaunchParams,
 }
 
 struct HandlePool {
@@ -308,6 +311,7 @@ impl State {
             handles: HandlePool::new(),
             devmemory: Allocator::new(),
             modules: ModuleLaunchData::new()?,
+            launch_params: Default::default(),
         })
     }
 }
@@ -1056,42 +1060,37 @@ fn cu_launch_kernel(
 ) -> Result<cuLaunchKernelOut, CUerror> {
     let mut device = 0;
     unsafe { cuCtxGetDevice(&mut device) }?;
-    let mut params = input
-        .kernel_params
-        .iter()
-        .map(|p| p.as_ptr().cast_mut().cast::<c_void>())
-        .collect::<Vec<_>>();
-    let mut base64_ptr = state.devmemory.get_device_ptr()?;
-    params.push(ptr::from_mut(&mut base64_ptr).cast());
+    let base64_ptr = state.devmemory.get_device_ptr()?;
     let function = CUfunction(state.handles.get(input.f.to_native())?);
     let function_info = state
         .modules
         .functions
         .get(&function)
         .ok_or(CUerror::INVALID_VALUE)?;
-    let globals = function_info
-        .globals
-        .iter()
-        .map(|global| global.allocation.start * Allocator::ALLOCATION_UNIT)
-        .collect::<Vec<_>>();
-    for g in globals.iter() {
-        params.push(ptr::from_ref(g).cast_mut().cast());
-    }
-    unsafe {
-        cuLaunchKernel(
-            function,
-            input.grid_dim_x.to_native(),
-            input.grid_dim_y.to_native(),
-            input.grid_dim_z.to_native(),
-            input.block_dim_x.to_native(),
-            input.block_dim_y.to_native(),
-            input.block_dim_z.to_native(),
-            input.shared_mem_bytes.to_native(),
-            CUstream(state.handles.get(input.stream.to_native())?),
-            params.as_mut_ptr(),
-            std::ptr::null_mut(),
-        )
-    }?;
+    let stream = CUstream(state.handles.get(input.stream.to_native())?);
+    state.launch_params.with_arguments(
+        input
+            .kernel_params
+            .iter()
+            .map(|p| p.as_ptr().cast_mut().cast::<c_void>()),
+        base64_ptr,
+        function_info.globals.iter().map(Global::address),
+        |params| unsafe {
+            cuLaunchKernel(
+                function,
+                input.grid_dim_x.to_native(),
+                input.grid_dim_y.to_native(),
+                input.grid_dim_z.to_native(),
+                input.block_dim_x.to_native(),
+                input.block_dim_y.to_native(),
+                input.block_dim_z.to_native(),
+                input.shared_mem_bytes.to_native(),
+                stream,
+                params.as_mut_ptr(),
+                std::ptr::null_mut(),
+            )
+        },
+    )?;
     Ok(cuLaunchKernelOut {})
 }
 

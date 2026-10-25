@@ -1,13 +1,11 @@
 use cuda_macros::cuda_function_declarations;
 use cuda_types::cuda::*;
 use dark_api::cuda::CudaDarkApi;
-use dark_api::FunctionArgInfo;
 use paste::paste;
 use rkyv::rancor::{Failure, Strategy};
 use rkyv::rend::u32_le;
 use rkyv::{Archive, Deserialize, Portable, Serialize};
 use rustc_hash::FxHashMap;
-use std::alloc::Layout;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Mutex, OnceLock};
 use std::{cell::RefCell, ffi::c_void, ptr};
@@ -15,6 +13,7 @@ use zluda_common::{CodeLibraryRef, CodeModuleRef};
 use zluda_server_common::*;
 
 mod ipc;
+mod launch_args;
 mod range_cache;
 mod texture_metadata;
 
@@ -154,7 +153,8 @@ impl ContextStack {
 
 struct GlobalState {
     server: ipc::Server,
-    function_args: FxHashMap<CUfunction, Vec<FunctionArgInfo>>,
+    function_args: FxHashMap<CUfunction, launch_args::ArgumentLayout>,
+    launch_buffers: launch_args::LaunchBuffers,
     next_context: u32,
     context_state: FxHashMap<
         cuda_types::cuda::CUcontext,
@@ -180,6 +180,7 @@ impl GlobalState {
         LOCK.get_or_init(|| {
             Ok(Mutex::new(GlobalState {
                 function_args: FxHashMap::default(),
+                launch_buffers: Default::default(),
                 server: unsafe { ipc::Server::start() }?,
                 next_context: 1024 * 1024,
                 context_state: FxHashMap::default(),
@@ -515,7 +516,13 @@ pub(crate) fn cu_launch_kernel(
         return Err(CUerror::NOT_SUPPORTED);
     }
     let mut state = GlobalState::get()?.lock().map_err(|_| CUerror::UNKNOWN)?;
-    let args = state.function_args.get(&f).ok_or(CUerror::INVALID_VALUE)?;
+    let GlobalState {
+        function_args,
+        launch_buffers,
+        server,
+        ..
+    } = &mut *state;
+    let args = function_args.get(&f).ok_or(CUerror::INVALID_VALUE)?;
     let extra_slice = unsafe { std::slice::from_raw_parts(extra, 5) };
     if extra_slice[0] != CU_LAUNCH_PARAM_BUFFER_POINTER_AS_INT as _ {
         return Err(CUerror::INVALID_VALUE);
@@ -527,30 +534,22 @@ pub(crate) fn cu_launch_kernel(
         return Err(CUerror::INVALID_VALUE);
     }
     let arg_ptr = extra_slice[1];
-    let arg_size = unsafe { *extra_slice[3].cast::<usize>() };
-    let mut total_size = 0;
-    let kernel_params = args
-        .iter()
-        .scan(
-            unsafe { Layout::from_size_align_unchecked(0, 1) },
-            |layout, arg_info| {
-                let (new_layout, offset) = layout.extend(arg_info.to_layout().unwrap()).unwrap();
-                total_size = offset + arg_info.size as usize;
-                *layout = new_layout;
-                let start = arg_ptr.wrapping_byte_add(offset as usize).cast::<u8>();
-                Some(Ok(unsafe {
-                    std::slice::from_raw_parts(start, arg_info.size as usize)
-                }
-                .to_vec()))
-            },
-        )
-        .collect::<Result<Vec<_>, CUerror>>()?;
-    if total_size as usize != arg_size {
+    if extra_slice[3].is_null() {
         return Err(CUerror::INVALID_VALUE);
     }
-    state.server.remote_call_framed_in::<cuLaunchKernelOut>(
-        Opcode::cuLaunchKernel,
-        cuLaunchKernelIn {
+    let arg_size = unsafe { *extra_slice[3].cast::<usize>() };
+    // Validate the complete packed size before reading any argument bytes.
+    if arg_size != args.size() || (arg_size != 0 && arg_ptr.is_null()) {
+        return Err(CUerror::INVALID_VALUE);
+    }
+    let packed = if arg_size == 0 {
+        &[]
+    } else {
+        unsafe { std::slice::from_raw_parts(arg_ptr.cast::<u8>(), arg_size) }
+    };
+    let slices = args.slices(packed).ok_or(CUerror::INVALID_VALUE)?;
+    launch_buffers.with_arguments(slices, |kernel_params| {
+        let request = cuLaunchKernelIn {
             f: CudaEncode::encode(f),
             grid_dim_x: u32_le::from_native(grid_dim_x),
             grid_dim_y: u32_le::from_native(grid_dim_y),
@@ -561,9 +560,13 @@ pub(crate) fn cu_launch_kernel(
             shared_mem_bytes: u32_le::from_native(shared_mem_bytes),
             stream: CudaEncode::encode(stream),
             kernel_params,
-        },
-    )?;
-    Ok(())
+        };
+        let result = server
+            .remote_call_framed_in_ref::<cuLaunchKernelOut>(Opcode::cuLaunchKernel, &request)
+            .map(|_| ());
+        // Do not use `?` before returning storage: failures must retain capacity too.
+        (request.kernel_params, result)
+    })
 }
 
 pub(crate) fn cu_mem_alloc_v2(dptr: *mut CUdeviceptr, bytesize: usize) -> Result<(), CUerror> {
@@ -747,7 +750,10 @@ pub(crate) fn cu_module_get_function(
                 f: CudaEncode::encode(*hfunc),
             },
         )?;
-    state.function_args.insert(*hfunc, arg_sizes_out.args);
+    let layout = launch_args::ArgumentLayout::new(
+        arg_sizes_out.args.iter().map(|arg| (arg.size as usize, arg.align as usize)),
+    ).ok_or(CUerror::INVALID_VALUE)?;
+    state.function_args.insert(*hfunc, layout);
     Ok(())
 }
 

@@ -44,3 +44,27 @@ metadata setters, not a general guarantee for arbitrary CUDA implementations.
 The installer enables it for modified/default and disables it for the reference.
 No measured FPS improvement is established. The diagnostic-work gate is also in
 this pending build, so a whole-build comparison does not isolate the two changes.
+
+## Reusable launch preparation
+
+The Windows server retains the capacity of its kernel-parameter pointer array
+and 32-bit global-offset array between requests. Values are rebuilt for every
+launch, and both logical arrays are cleared after the native call, including
+error returns. All global storage growth finishes before pointers into it are
+formed. The native argument order and synchronous parameter-consumption lifetime
+match the previous temporary-vector implementation. No GPU waits are removed.
+
+This is a small host-side allocation optimization. Historical measurements put
+all host launch service at about 0.62% of measured server service time in one
+capture, so this alone is not expected to produce a large FPS improvement.
+
+## Reusable proxy argument buffers
+
+The 32-bit proxy caches each function's packed argument layout when argument
+metadata is received. It checks the packed byte count before reading the caller's
+buffer, then copies argument values into reusable owned byte vectors. Unused
+slots are retained for subsequent functions with more arguments. The outer vector
+and inner buffers are recovered after both successful and failed IPC requests.
+The existing `cuLaunchKernelIn` archive and synchronous IPC exchange are unchanged;
+this does not revive the retired host/device transfer-copy experiments. Capacity
+tracks the largest argument shapes encountered by this process.

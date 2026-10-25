@@ -1,3 +1,31 @@
+# Next: reuse launch arguments in the 32-bit proxy
+
+Added reusable outer/inner argument vectors and cached immutable per-function
+packed layouts. Requests still serialize the existing owned cuLaunchKernelIn;
+a borrowed IPC entry point lets the proxy recover buffers after success/error.
+Packed length and nonzero null pointers are checked before constructing slices.
+No caller pointer is retained, and GlobalState's mutex covers prepare/send/reclaim.
+Three new portable tests verify alignment, allocation reuse and shape/error changes.
+Windows i686 type-check passed; 63 local tests passed including existing coverage.
+User owns push/build/install. No remote mutation or claim about frame-time gains.
+
+## Previous work
+
+# Next prototype: reuse kernel launch argument storage
+
+User reported 29–30 FPS with 6203af6 (texture metadata cache + diagnostic gating).
+Retain that revision as the previous candidate. The next change reuses two server
+scratch Vec capacities instead of allocating parameter/global arrays every launch.
+Values and pointers are rebuilt each call and cleared after success/error; no
+CUDA call, synchronization, argument order or wire format is changed.
+Three portable tests cover argument ABI, growth/reuse and error cleanup. Server
+and tests type-check for Windows with physx-texture-reuse. Full build/game testing
+remains with the user's script. No push, install or PR was performed.
+Expected benefit is modest: historical host launch service was only 0.62% in one
+capture. Do not attribute FPS changes without repeated comparisons.
+
+## Previous work
+
 # Pending: cache repeated texture metadata setters in the 32-bit proxy
 
 User steered back to the previously proposed redundant-IPC idea. Added a bounded

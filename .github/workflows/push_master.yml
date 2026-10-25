@@ -240,12 +240,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:RUNNER_TEMP/range-cache-tests.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test reusable kernel launch arguments
+        shell: pwsh
+        run: |
+          rustc --edition=2021 --test zluda64_server/src/launch_params.rs -o "$env:RUNNER_TEMP/launch-params-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP/launch-params-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test texture metadata cache
         shell: pwsh
         run: |
           rustc --edition=2021 --test zluda32/src/texture_metadata.rs -o "$env:RUNNER_TEMP/texture-metadata-tests.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:RUNNER_TEMP/texture-metadata-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test reusable proxy launch buffers
+        shell: pwsh
+        run: |
+          rustc --edition=2021 --test zluda32/src/launch_args.rs -o "$env:RUNNER_TEMP/proxy-launch-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP/proxy-launch-tests.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build matching 32-bit proxy
         shell: pwsh
