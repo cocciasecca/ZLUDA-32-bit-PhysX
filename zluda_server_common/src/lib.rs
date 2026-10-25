@@ -529,3 +529,42 @@ mod borrowed_transfer_tests {
         }
     }
 }
+
+impl ArchivedcuMemcpyDtoHAsync_v2Out {
+    /// Copy directly from the reply archive, without materializing an owned Vec.
+    pub fn copy_to_host(&self, destination: &mut [u8]) -> Result<(), CUerror> {
+        if destination.len() != self.dst_host.len() {
+            return Err(CUerror::UNKNOWN);
+        }
+        destination.copy_from_slice(self.dst_host.as_slice());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod direct_readback_tests {
+    use super::*;
+
+    #[test]
+    fn readback_matches_owned_decode_after_growth_and_reuse() {
+        let mut arena = stumpalo::Arena::new();
+        let mut buffer = message_buffer::MessageBuffer::new();
+        for size in [0, 1, 257, 1024 * 1024 + 137, 7] {
+            let reply = cuMemcpyDtoHAsync_v2Out {
+                dst_host: (0..size).map(|i| (i % 251) as u8).collect(),
+            };
+            buffer.serialize_body(&mut arena, &reply).unwrap();
+            let owned = buffer.deserialize_body::<cuMemcpyDtoHAsync_v2Out>().unwrap();
+            let archive = buffer.deserialize_body2::<cuMemcpyDtoHAsync_v2Out>();
+            let mut destination = vec![255; size];
+            archive.copy_to_host(&mut destination).unwrap();
+            assert_eq!(destination, owned.dst_host);
+            let mut wrong_size = vec![123; size + 1];
+            assert!(archive.copy_to_host(&mut wrong_size).is_err());
+            assert!(wrong_size.iter().all(|&byte| byte == 123));
+            // Once copied, reusing the IPC message cannot change the caller data.
+            buffer.serialize_body(&mut arena, &cuMemcpyDtoHAsync_v2Out { dst_host: vec![42] }).unwrap();
+            assert_eq!(destination, reply.dst_host);
+        }
+    }
+}

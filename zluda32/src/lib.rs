@@ -667,16 +667,15 @@ pub(crate) fn cu_memcpy_dto_h_async_v2(
         return Err(CUerror::INVALID_VALUE);
     }
     let dst_slice = unsafe { std::slice::from_raw_parts_mut(dst_host.cast::<u8>(), byte_count) };
-    let result = GlobalState::remote_call_framed_out::<cuMemcpyDtoHAsync_v2Out>(
-        Opcode::cuMemcpyDtoHAsync_v2,
+    let mut state = GlobalState::get()?.lock().map_err(|_| CUerror::UNKNOWN)?;
+    state.server.memcpy_dtoh(
         cuMemcpyDtoHAsync_v2In {
             src_device: CudaEncode::encode(src_device),
             stream: CudaEncode::encode(stream),
             byte_count: u32_le::from_native(byte_count as u32),
         },
-    )?;
-    dst_slice.copy_from_slice(&result.dst_host);
-    Ok(())
+        dst_slice,
+    )
 }
 
 pub(crate) fn cu_memcpy_hto_d_async_v2(

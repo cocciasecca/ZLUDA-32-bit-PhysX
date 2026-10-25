@@ -226,6 +226,28 @@ impl Server {
     where
         <Out as Archive>::Archived: Deserialize<Out, Strategy<(), Failure>>,
     {
+        self.receive_framed_out(opcode, data)?;
+        self.local.shared_memory.deserialize_body()
+    }
+
+    pub(crate) fn memcpy_dtoh(
+        &mut self,
+        data: zluda_server_common::cuMemcpyDtoHAsync_v2In,
+        destination: &mut [u8],
+    ) -> Result<(), CUerror> {
+        self.receive_framed_out(Opcode::cuMemcpyDtoHAsync_v2, data)?;
+        // The caller holds GlobalState's mutex until this copy completes. Neither
+        // another request nor a mapping replacement can invalidate the archive.
+        self.local.shared_memory
+            .deserialize_body2::<zluda_server_common::cuMemcpyDtoHAsync_v2Out>()
+            .copy_to_host(destination)
+    }
+
+    fn receive_framed_out(
+        &mut self,
+        opcode: Opcode,
+        data: impl for<'a, 'b> Serialize<Serializer<'a, 'b>>,
+    ) -> Result<(), CUerror> {
         self.prepare_range_cache(&opcode);
         self.remote.shared_memory.write_header(opcode as u32);
         self.remote.shared_memory.write_body(&data);
@@ -248,7 +270,7 @@ impl Server {
                 Err(CUerror(code))
             }
         }?;
-        self.local.shared_memory.deserialize_body()
+        Ok(())
     }
 }
 
