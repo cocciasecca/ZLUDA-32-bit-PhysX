@@ -22,7 +22,7 @@ def main():
      else:assert os.readlink(p)==info['symlink']
     for row in (payload/'SHA256SUMS.txt').read_text(encoding='utf-8-sig').splitlines():
      h,n=row.split(None,1);assert sha(payload/n.replace('\\','/'))==h
-    assert 'Configuration: windows-borrowed-transfers-v1' in (payload/'README.txt').read_text(encoding='utf-8-sig'), 'Incompatible package'
+    assert 'Configuration: windows-original-transfers-v1' in (payload/'README.txt').read_text(encoding='utf-8-sig'), 'Incompatible package'
     prefix=root.parents[1]/'steamapps/compatdata/35140/pfx'
     prefix_before={rel:sha(prefix/rel) for rel in ['drive_c/windows/syswow64/nvcuda.dll','drive_c/windows/system32/nvcuda.dll']}
     record_path=root/f'update-manifest-{run_id}-{profile}.json'

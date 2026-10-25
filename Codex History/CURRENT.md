@@ -1,3 +1,14 @@
+# Current: Windows with original host-transfer copies
+
+User requested removing the CPU-to-GPU borrowed-transfer optimization too.
+Both HtoD entry points again use slice.to_vec() and the original wire structs.
+The borrowed structs/tests were removed. GPU-to-CPU already uses the original
+owned decode. Texture deferral and range cache remain enabled.
+Package marker: windows-original-transfers-v1, checked by both installers to
+reject earlier experimental payloads. No push/build/Legion installation performed.
+
+## Historical notes (superseded)
+
 # Latest result: revert direct GPU-to-CPU readback
 
 User reports 29 FPS for 17d51b3 and 24 FPS for ae52d74. Reverted only the

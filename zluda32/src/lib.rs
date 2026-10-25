@@ -691,9 +691,9 @@ pub(crate) fn cu_memcpy_hto_d_async_v2(
     let slice = unsafe { std::slice::from_raw_parts(src_host.cast::<u8>(), byte_count) };
     GlobalState::remote_call_framed_in::<cuMemcpyHtoDAsync_v2Out>(
         Opcode::cuMemcpyHtoDAsync_v2,
-        MemcpyHtoDAsyncBorrowed {
+        cuMemcpyHtoDAsync_v2In {
             dst_device: CudaEncode::encode(dst_device),
-            src_host: std::borrow::Cow::Borrowed(slice),
+            src_host: slice.to_vec(),
             stream: CudaEncode::encode(h_stream),
         },
     )?;
@@ -1104,9 +1104,9 @@ pub(crate) fn cu_memcpy_hto_d_v2(
     let slice = unsafe { std::slice::from_raw_parts(src_host.cast::<u8>(), byte_count) };
     GlobalState::remote_call_framed_in::<cuMemcpyHtoD_v2Out>(
         Opcode::cuMemcpyHtoD_v2,
-        MemcpyHtoDBorrowed {
+        cuMemcpyHtoD_v2In {
             dst_device: CudaEncode::encode(dst_device),
-            src_host: std::borrow::Cow::Borrowed(slice),
+            src_host: slice.to_vec(),
         },
     )?;
     Ok(())

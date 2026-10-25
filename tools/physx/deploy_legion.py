@@ -35,7 +35,7 @@ def deploy(run_id, host='deck@192.168.10.67', key=None, profile='texture-deferra
         root = Path(temp)
         payload = root/'payload'
         run('gh', 'run', 'download', run_id, '--repo', REPO, '-n', f'physx-servers-{sha}', '-D', str(payload))
-        if 'Configuration: windows-borrowed-transfers-v1' not in (payload/'README.txt').read_text(encoding='utf-8-sig'):
+        if 'Configuration: windows-original-transfers-v1' not in (payload/'README.txt').read_text(encoding='utf-8-sig'):
             raise RuntimeError('Build precedente incompatibile: esegui la build della configurazione corrente.')
         expected = {'32/nvcuda.dll', 'control/zluda64_server.exe', 'diagnostic/zluda64_server.exe'}
         seen = set()

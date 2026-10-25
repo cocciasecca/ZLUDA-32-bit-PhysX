@@ -13,7 +13,7 @@ installer = fixtures.module('windows_installer_test', fixtures.HERE.parent/'legi
 class WindowsMigrationTests(unittest.TestCase):
     def prepare(self, base):
         root, _, prefix = fixtures.InstallationTests().fixture(base)
-        (base/'payload/README.txt').write_text('Configuration: windows-borrowed-transfers-v1')
+        (base/'payload/README.txt').write_text('Configuration: windows-original-transfers-v1')
         for name in ['zluda64_server.exe', 'README.txt', 'SHA256SUMS.txt']:
             target = root/'diagnostic-control'/name
             target.parent.mkdir(exist_ok=True)

@@ -14,11 +14,10 @@ python3 tools/physx/push_build.py --install-run NUMERO_RUN
 
 Il percorso sperimentale compila DLL a 32 bit e server Windows con rinvio delle
 distruzioni texture e cache dei range attivi. Non compila LLVM/backend Linux.
-Il nuovo prototipo elimina il vettore temporaneo nei trasferimenti host→device,
-serializzando direttamente i byte del chiamante nel messaggio IPC originale.
-Ordine, attese GPU e protocollo ricevuto dal server restano invariati.
+I trasferimenti CPU→GPU e GPU→CPU usano nuovamente il percorso originale
+con vettori temporanei. Entrambi gli esperimenti sulle copie sono stati rimossi.
 
-Il pacchetto corrente ha configurazione `windows-borrowed-transfers-v1`.
+Il pacchetto corrente ha configurazione `windows-original-transfers-v1`.
 Non riutilizzare i run Linux 40020496411 o 40080854541.
 
 L'installer verifica gioco/server chiusi e crea un backup. Se trova il wrapper
