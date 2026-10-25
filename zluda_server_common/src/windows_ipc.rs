@@ -1,3 +1,6 @@
+//! Windows events and named shared mappings for the serialized 32/64-bit bridge.
+//! Both peers must be built from the same revision. A mapping-growth reply is
+//! consumed before decoding its payload; no archived reference may survive reuse.
 use super::*;
 use rand::distr::{Alphanumeric, SampleString};
 use windows::core::{Owned, PCSTR};

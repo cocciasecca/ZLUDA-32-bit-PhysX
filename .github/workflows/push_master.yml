@@ -202,8 +202,8 @@ jobs:
         with:
           toolchain: stable
           target: x86_64-pc-windows-msvc,i686-pc-windows-msvc
-      - name: Test archived installer and runtime helpers
-        run: python -B -m unittest discover -s tools/physx/native -p "test_*.py"
+      - name: Test Windows installer and rollback
+        run: python -B -m unittest discover -s tools/physx/tests -p "test_*.py"
       - name: Test portable diagnostic aggregation
         shell: pwsh
         run: |
@@ -240,11 +240,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:RUNNER_TEMP/range-cache-tests.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Test common IPC library
-        shell: pwsh
-        run: |
-          cargo test --locked --release -p zluda_server_common --lib --target x86_64-pc-windows-msvc
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build matching 32-bit proxy
         shell: pwsh
         run: |
@@ -279,5 +274,44 @@ jobs:
         with:
           name: physx-servers-${{ github.sha }}
           path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+      # Build the unmodified upstream bridge with the same runner/toolchain as ours.
+      # Keep this pinned until the benchmark is complete; updating master is separate.
+      - uses: actions/checkout@v4
+        with:
+          repository: vosen/ZLUDA
+          ref: 86ec0a93cc83ba5b52e645892523e339dfa884f7
+          path: reference-source
+      - name: Build unmodified upstream reference bridge
+        shell: pwsh
+        working-directory: reference-source
+        run: |
+          cargo build --locked --release -p zluda64_server --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build --locked --release -p zluda32 --target i686-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force ../reference-artifacts/control, ../reference-artifacts/diagnostic, ../reference-artifacts/32 | Out-Null
+          Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe ../reference-artifacts/control/
+          Copy-Item target/x86_64-pc-windows-msvc/release/zluda64_server.exe ../reference-artifacts/diagnostic/
+          Copy-Item target/i686-pc-windows-msvc/release/nvcuda.dll ../reference-artifacts/32/
+          @(
+            "Commit: 86ec0a93cc83ba5b52e645892523e339dfa884f7"
+            "Configuration: windows-reference-86ec0a9-v1"
+            "Unmodified upstream Windows bridge; same base as the PhysX changes."
+            "Both server copies are identical, with no optional features."
+            "Comparison covers the 32/64-bit bridge, not a different HIP, Proton or 64-bit ZLUDA runtime."
+            (rustc --version)
+            (cargo --version)
+          ) | Set-Content ../reference-artifacts/README.txt
+          Get-ChildItem ../reference-artifacts -Recurse -File | Where-Object { $_.Extension -in ".exe", ".dll" } | ForEach-Object {
+            $relative = $_.FullName.Substring((Resolve-Path ../reference-artifacts).Path.Length + 1)
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $relative
+          } | Set-Content ../reference-artifacts/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: physx-reference-${{ github.sha }}
+          path: reference-artifacts/
           if-no-files-found: error
           retention-days: 14

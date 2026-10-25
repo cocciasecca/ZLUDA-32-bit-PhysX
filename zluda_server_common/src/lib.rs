@@ -398,20 +398,9 @@ pub struct cuMemcpyDtoHAsync_v2Out {
     pub dst_host: Vec<u8>,
 }
 
-pub mod message_buffer;
-pub mod native_rpc;
-#[cfg(windows)]
+// The 32-bit proxy and 64-bit server use the same Windows shared-memory protocol.
 mod windows_ipc;
-#[cfg(unix)]
-pub use message_buffer::MessageBuffer as SharedMemory;
-#[cfg(windows)]
 pub use windows_ipc::*;
-#[cfg(unix)]
-pub struct Endpoint {
-    pub shared_memory: SharedMemory,
-    pub connection: Option<native_rpc::Connection>,
-    pub disconnected: bool,
-}
 
 #[derive(Debug)]
 pub enum AllocError {

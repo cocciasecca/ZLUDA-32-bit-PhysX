@@ -11,6 +11,8 @@ use windows::Win32::Foundation::*;
 use windows::Win32::System::Threading::*;
 use zluda_server_common::{Opcode, Serializer};
 
+// Access is serialized by GlobalState's mutex. Cache entries and shared-memory
+// replies must not outlive the allocation/context state protected by that lock.
 pub(crate) struct Server {
     local: zluda_server_common::Endpoint,
     remote: zluda_server_common::Endpoint,

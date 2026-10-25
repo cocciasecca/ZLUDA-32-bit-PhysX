@@ -1,4 +1,7 @@
-//! Successful server replies only; never infer rounded allocation sizes locally.
+//! Cache successful address-range replies from the serialized Windows server.
+//! The server rounds allocations, so requested sizes cannot be used as bounds.
+//! Callers must invalidate on allocation/context/module lifetime changes and errors;
+//! unknown operations are conservative cache barriers in `ipc.rs`.
 use std::collections::BTreeMap;
 #[derive(Default)]
 pub(crate) struct RangeCache {

@@ -1556,6 +1556,9 @@ impl texture_reuse::Backend for BridgeTextures<'_> {
 
 #[cfg(feature = "physx-texture-reuse")]
 impl State {
+    // Run before dispatch: deferred unbinds must become native unbinds before
+    // any kernel, lifetime change or unrecognized operation can observe them.
+    // Kernel classification is diagnostic only and never relaxes this barrier.
     fn texture_reuse_barrier(&mut self, opcode: u32, local: &Endpoint) -> Result<(), CUerror> {
         use texture_reuse::Boundary;
         let boundary = match Opcode::from_repr(opcode) {

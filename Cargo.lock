@@ -5090,7 +5090,6 @@ dependencies = [
  "cuda_macros",
  "cuda_types",
  "dark_api",
- "libc",
  "ptx_parser",
  "range-alloc",
  "rkyv",
