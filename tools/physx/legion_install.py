@@ -29,7 +29,8 @@ def main():
     reuse = not reference
     # The reuse-enabled binary lives in diagnostic/ for artifact compatibility.
     # It is the default binary; control/ deliberately has reuse compiled out.
-    diagnostic = profile == "texture-deferral"
+    # Ordinary gameplay must not pay for diagnostics; enable explicitly for profiling.
+    diagnostic = False
     probe = False
     assert (
         run_id.isdecimal()
@@ -59,7 +60,7 @@ def main():
         h, n = row.split(None, 1)
         assert sha(payload / n.replace("\\", "/")) == h
     configuration = (
-        "windows-reference-86ec0a9-v1" if reference else "windows-original-transfers-v1"
+        "windows-reference-86ec0a9-v1" if reference else "windows-texref-cache-v1"
     )
     assert "Configuration: " + configuration in (payload / "README.txt").read_text(
         encoding="utf-8-sig"
@@ -137,6 +138,7 @@ def main():
     user_settings["ZLUDA_PHYSX_TEXTURE_REUSE"] = "{int(reuse)}"
     user_settings["ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS"] = "{int(reuse)}"
     user_settings["ZLUDA_PHYSX_RANGE_CACHE"] = "{int(reuse)}"
+    user_settings["ZLUDA_PHYSX_TEXREF_CACHE"] = "{int(reuse)}"
     user_settings["ZLUDA_PHYSX_SPLIT_UNBIND"] = "{int(probe)}"
     user_settings["ZLUDA_PHYSX_TEXTURE_GLOBAL_PROBE"] = "0"
     user_settings["ZLUDA_PHYSX_POOL_CAPTURE"] = "0"
@@ -191,6 +193,7 @@ def main():
         "texture_reuse_enabled": reuse,
         "texture_reuse_transfers": reuse,
         "range_cache_enabled": reuse,
+        "texture_metadata_cache_enabled": reuse,
         "settings_sha256": sha(settings),
     }
     if (root / "native-install-last.json").exists():

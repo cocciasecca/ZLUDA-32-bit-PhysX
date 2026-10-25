@@ -1,0 +1,69 @@
+{
+  "started_utc": "2026-10-25T21:04:11Z",
+  "complete": true,
+  "duration_seconds": 30.00010270799976,
+  "mean_cpu_percent": {
+    "game": 55.3664815850018,
+    "server": 83.83304928284844
+  },
+  "processes": {
+    "game": {
+      "pid": 24306,
+      "flags": {
+        "ZLUDA_PHYSX_TEXTURE_REUSE": "1",
+        "ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS": "1",
+        "ZLUDA_PHYSX_RANGE_CACHE": "1",
+        "ZLUDA_PHYSX_DIAGNOSTICS": "<unset>"
+      },
+      "loaded_file_hashes": {
+        "/home/deck/.local/share/Steam/steamapps/compatdata/35140/pfx/drive_c/windows/syswow64/nvcuda.dll": "76ddb2aefc88571481682f82489a56ff30519fda78569d703b74c9eae7d1c44f"
+      }
+    },
+    "server": {
+      "pid": 24353,
+      "flags": {
+        "ZLUDA_PHYSX_TEXTURE_REUSE": "1",
+        "ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS": "1",
+        "ZLUDA_PHYSX_RANGE_CACHE": "1",
+        "ZLUDA_PHYSX_DIAGNOSTICS": "<unset>"
+      },
+      "loaded_file_hashes": {
+        "/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/zluda-libs/libamdhip64.so.7": "c05034a11d50afe17287f191db2c0c587b9d35cb53d8cda5933705f4dab2047c",
+        "/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/zluda/nvcuda.dll": "3d9b46c4b43bfefebf41271a2cd68aee32ef6d870fcadf4a431fb103cecbe1a9",
+        "/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/zluda/zluda64_server.exe": "501b98b50b5744864d1054d963324c3ecf6a7b83830f5b855a350e51d69bafed"
+      }
+    }
+  },
+  "sensors": {
+    "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": {
+      "mean": 15702200,
+      "min": 11856000,
+      "max": 27826000,
+      "label": "PPT"
+    },
+    "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": {
+      "mean": 53600,
+      "min": 53000,
+      "max": 55000,
+      "label": "edge"
+    },
+    "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": {
+      "mean": 1206966666.6666667,
+      "min": 800000000,
+      "max": 1323000000,
+      "label": "sclk"
+    },
+    "/sys/class/drm/card0/device/gpu_busy_percent": {
+      "mean": 69.53333333333333,
+      "min": 69,
+      "max": 70,
+      "label": null
+    }
+  },
+  "threads": {
+    "24353": 81.69972220273506,
+    "24354": 2.166659779891455,
+    "24355": 0.0
+  },
+  "user_reported_fps": 23
+}

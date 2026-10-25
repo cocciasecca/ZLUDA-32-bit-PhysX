@@ -42,6 +42,7 @@ def main():
     names = ["diagnostics", "texture_diagnostics", "texture_reuse", "texture_shadow"]
     sources = [root / f"zluda64_server/src/{name}.rs" for name in names]
     sources.append(root / "zluda32/src/range_cache.rs")
+    sources.append(root / "zluda32/src/texture_metadata.rs")
     digest = hashlib.sha256(version + Path(__file__).read_bytes())
     for source in sources:
         digest.update(str(source).encode())

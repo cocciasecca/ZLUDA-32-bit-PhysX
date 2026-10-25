@@ -20,6 +20,8 @@ pub(crate) struct Server {
     arena: stumpalo::Arena,
     range_cache: crate::range_cache::RangeCache,
     range_cache_enabled: bool,
+    texture_metadata: crate::texture_metadata::TextureMetadata,
+    texture_metadata_enabled: bool,
     range_queries: u64,
     range_hits: u64,
     range_log: Option<std::fs::File>,
@@ -89,6 +91,8 @@ impl Server {
             arena,
             range_cache: Default::default(),
             range_cache_enabled,
+            texture_metadata: Default::default(),
+            texture_metadata_enabled: env::var("ZLUDA_PHYSX_TEXREF_CACHE").as_deref() == Ok("1"),
             range_queries: 0,
             range_hits: 0,
             range_log,
@@ -97,8 +101,12 @@ impl Server {
 
     pub(crate) fn invalidate_ranges(&mut self) {
         self.range_cache.clear();
+        self.texture_metadata.clear();
     }
 
+    // The same barriers invalidate metadata: supported launch/copy/event/address
+    // operations do not change texture format or flags. Context changes also call
+    // invalidate_ranges directly. Future setters must be barriers until audited.
     // Unknown/future operations invalidate by default. Only operations audited
     // not to change the bridge allocation map can retain cached replies.
     fn prepare_range_cache(&mut self, opcode: &Opcode) {
@@ -167,6 +175,36 @@ impl Server {
                     self.range_log = None;
                 }
             }
+        }
+        result
+    }
+
+    pub(crate) fn texture_flags(&mut self, handle: u32, flags: u32) -> Result<(), CUerror> {
+        if self.texture_metadata_enabled && self.texture_metadata.flags_match(handle, flags) {
+            return Ok(());
+        }
+        let result = self.remote_call_zero_copy::<zluda_server_common::cuTexRefSetFlagsOut>(
+            Opcode::cuTexRefSetFlags,
+            zluda_server_common::cuTexRefSetFlagsIn { hTexRef: handle.into(), Flags: flags },
+        ).map(|_| ());
+        if self.texture_metadata_enabled {
+            self.texture_metadata.flags_result(handle, flags, result.is_ok());
+        }
+        result
+    }
+
+    pub(crate) fn texture_format(&mut self, handle: u32, format: u32, channels: i32) -> Result<(), CUerror> {
+        if self.texture_metadata_enabled && self.texture_metadata.format_matches(handle, format, channels) {
+            return Ok(());
+        }
+        let result = self.remote_call_zero_copy::<zluda_server_common::cuTexRefSetFormatOut>(
+            Opcode::cuTexRefSetFormat,
+            zluda_server_common::cuTexRefSetFormatIn {
+                hTexRef: handle.into(), fmt: format.into(), NumPackedComponents: channels,
+            },
+        ).map(|_| ());
+        if self.texture_metadata_enabled {
+            self.texture_metadata.format_result(handle, format, channels, result.is_ok());
         }
         result
     }

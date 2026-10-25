@@ -53,7 +53,5 @@ class InstallationFixture:
         (payload / "SHA256SUMS.txt").write_text(
             "\n".join(sha(payload / name) + "  " + name for name in names)
         )
-        (payload / "README.txt").write_text(
-            "Configuration: windows-original-transfers-v1"
-        )
+        (payload / "README.txt").write_text("Configuration: windows-texref-cache-v1")
         return root, initial, prefix

@@ -19,6 +19,24 @@ def run(*args):
     return subprocess.check_output(args, text=True)
 
 
+def validate_run(info, run_id):
+    """Reject incomplete builds before connecting to the device or downloading files."""
+    url = f"https://github.com/{REPO}/actions/runs/{run_id}"
+    if info["headBranch"] != BRANCH or info["workflowName"] != "ZLUDA":
+        raise RuntimeError(
+            f"Run non compatibile: serve il workflow ZLUDA del ramo {BRANCH}. {url}"
+        )
+    if info["status"] != "completed":
+        raise RuntimeError(
+            f"Build non ancora terminata (stato: {info['status']}). "
+            f"Attendi il completamento, poi ripeti lo stesso comando di installazione. {url}"
+        )
+    if info["conclusion"] != "success":
+        raise RuntimeError(
+            f"Build terminata con esito {info['conclusion']}; installazione non eseguita. {url}"
+        )
+
+
 def deploy(run_id, host="deck@192.168.10.67", key=None, profile="texture-deferral"):
     if profile not in (
         "texture-deferral",
@@ -41,15 +59,10 @@ def deploy(run_id, host="deck@192.168.10.67", key=None, profile="texture-deferra
             "--repo",
             REPO,
             "--json",
-            "headSha,headBranch,conclusion,workflowName",
+            "headSha,headBranch,conclusion,workflowName,status",
         )
     )
-    if (
-        info["headBranch"] != BRANCH
-        or info["conclusion"] != "success"
-        or info["workflowName"] != "ZLUDA"
-    ):
-        raise RuntimeError("Serve una build ZLUDA riuscita del ramo sperimentale")
+    validate_run(info, run_id)
     run_sha = info["headSha"]
     reference = profile == "comparison-reference"
     sha = REFERENCE_SHA if reference else run_sha
@@ -87,9 +100,7 @@ def deploy(run_id, host="deck@192.168.10.67", key=None, profile="texture-deferra
             str(payload),
         )
         configuration = (
-            "windows-reference-86ec0a9-v1"
-            if reference
-            else "windows-original-transfers-v1"
+            "windows-reference-86ec0a9-v1" if reference else "windows-texref-cache-v1"
         )
         if "Configuration: " + configuration not in (payload / "README.txt").read_text(
             encoding="utf-8-sig"

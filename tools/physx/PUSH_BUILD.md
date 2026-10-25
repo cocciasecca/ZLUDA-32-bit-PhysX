@@ -17,7 +17,7 @@ distruzioni texture e cache dei range attivi. Non compila LLVM/backend Linux.
 I trasferimenti CPU→GPU e GPU→CPU usano nuovamente il percorso originale
 con vettori temporanei. Entrambi gli esperimenti sulle copie sono stati rimossi.
 
-Il pacchetto corrente ha configurazione `windows-original-transfers-v1`.
+Il pacchetto corrente ha configurazione `windows-texref-cache-v1`.
 Non riutilizzare i run Linux 40020496411 o 40080854541.
 
 L'installer verifica gioco/server chiusi e crea un backup. Se trova il wrapper
@@ -60,5 +60,13 @@ Annotare media e, se disponibile, 1% low; riportare separatamente gli scatti al
 primo ingresso. Il secondo A serve a riconoscere cambiamenti di cache/temperatura.
 
 Il controllo gioco chiuso, verifica delle revisioni, backup e installazione restano
-automatici. Senza `--comparison`, il comando installa nuovamente il default con
-le impostazioni diagnostiche precedenti. Nessun secondo repository necessario.
+automatici. Senza `--comparison`, il comando installa il default con
+ottimizzazioni attive e diagnostica spenta. Nessun secondo repository necessario.
+
+## Diagnostic overhead follow-up
+
+The current server skips shadow histories, request classification and diagnostic
+PTX analysis when `ZLUDA_PHYSX_DIAGNOSTICS` is unset. The installer now leaves it
+unset by default. Texture reuse, synchronization and cleanup barriers are unchanged.
+For explicit profiling, set that variable to a new Wine-visible CSV base path in
+`user_settings.py` before starting the game; the next installation clears it again.

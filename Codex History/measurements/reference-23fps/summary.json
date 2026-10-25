@@ -1,0 +1,70 @@
+{
+  "started_utc": "2026-10-25T21:08:33Z",
+  "complete": true,
+  "duration_seconds": 30.000080843000433,
+  "mean_cpu_percent": {
+    "game": 54.39985633652751,
+    "server": 81.36644843206362
+  },
+  "processes": {
+    "game": {
+      "pid": 25602,
+      "flags": {
+        "ZLUDA_PHYSX_TEXTURE_REUSE": "0",
+        "ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS": "0",
+        "ZLUDA_PHYSX_RANGE_CACHE": "0",
+        "ZLUDA_PHYSX_DIAGNOSTICS": "<unset>"
+      },
+      "loaded_file_hashes": {
+        "/home/deck/.local/share/Steam/steamapps/compatdata/35140/pfx/drive_c/windows/syswow64/nvcuda.dll": "ef74c5bb88b90c4d8154c4c1dcd477ae58b31e4f9aaf2dfa4b01b448dfec5b2c"
+      }
+    },
+    "server": {
+      "pid": 25649,
+      "flags": {
+        "ZLUDA_PHYSX_TEXTURE_REUSE": "0",
+        "ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS": "0",
+        "ZLUDA_PHYSX_RANGE_CACHE": "0",
+        "ZLUDA_PHYSX_DIAGNOSTICS": "<unset>"
+      },
+      "loaded_file_hashes": {
+        "/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/zluda-libs/libamdhip64.so.7": "c05034a11d50afe17287f191db2c0c587b9d35cb53d8cda5933705f4dab2047c",
+        "/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/zluda/nvcuda.dll": "3d9b46c4b43bfefebf41271a2cd68aee32ef6d870fcadf4a431fb103cecbe1a9",
+        "/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/zluda/zluda64_server.exe": "7090a770a3010b7980ee28f999c244831bfd904b59d5207c33cc92e8663a250b"
+      }
+    }
+  },
+  "sensors": {
+    "/sys/class/drm/card0/device/gpu_busy_percent": {
+      "mean": 69.46666666666667,
+      "min": 69,
+      "max": 70,
+      "label": null
+    },
+    "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": {
+      "mean": 52200,
+      "min": 52000,
+      "max": 53000,
+      "label": "edge"
+    },
+    "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": {
+      "mean": 15265533.333333334,
+      "min": 10642000,
+      "max": 29518000,
+      "label": "PPT"
+    },
+    "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": {
+      "mean": 914433333.3333334,
+      "min": 800000000,
+      "max": 992000000,
+      "label": "sclk"
+    }
+  },
+  "threads": {
+    "25649": 81.16645214208282,
+    "25650": 0.199999898010046,
+    "25651": 0.0
+  },
+  "user_reported_fps": 23,
+  "user_observation": "Larger initial frame-rate drop; not captured as frame times."
+}

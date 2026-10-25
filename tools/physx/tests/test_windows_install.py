@@ -18,7 +18,7 @@ class WindowsMigrationTests(unittest.TestCase):
     def prepare(self, base):
         root, _, prefix = fixtures.InstallationFixture().fixture(base)
         (base / "payload/README.txt").write_text(
-            "Configuration: windows-original-transfers-v1"
+            "Configuration: windows-texref-cache-v1"
         )
         for name in ["zluda64_server.exe", "README.txt", "SHA256SUMS.txt"]:
             target = root / "diagnostic-control" / name
@@ -105,7 +105,7 @@ class WindowsMigrationTests(unittest.TestCase):
                 ),
                 (
                     "comparison-modified",
-                    "windows-original-transfers-v1",
+                    "windows-texref-cache-v1",
                     "1",
                     "diagnostic",
                 ),
@@ -117,7 +117,7 @@ class WindowsMigrationTests(unittest.TestCase):
                 ),
                 (
                     "texture-deferral",
-                    "windows-original-transfers-v1",
+                    "windows-texref-cache-v1",
                     "1",
                     "diagnostic",
                 ),
@@ -129,11 +129,14 @@ class WindowsMigrationTests(unittest.TestCase):
                 settings = {}
                 exec((root / "user_settings.py").read_text(), settings)
                 settings = settings["user_settings"]
-                for flag in ("TEXTURE_REUSE", "TEXTURE_REUSE_TRANSFERS", "RANGE_CACHE"):
+                for flag in (
+                    "TEXTURE_REUSE",
+                    "TEXTURE_REUSE_TRANSFERS",
+                    "RANGE_CACHE",
+                    "TEXREF_CACHE",
+                ):
                     self.assertEqual(settings["ZLUDA_PHYSX_" + flag], enabled)
-                self.assertEqual(
-                    "ZLUDA_PHYSX_DIAGNOSTICS" in settings, mode == "texture-deferral"
-                )
+                self.assertEqual("ZLUDA_PHYSX_DIAGNOSTICS" in settings, False)
                 self.assertEqual(
                     (root / "zluda/zluda64_server.exe").read_bytes(),
                     (base / "payload" / server / "zluda64_server.exe").read_bytes(),
@@ -148,9 +151,7 @@ class WindowsMigrationTests(unittest.TestCase):
                 record = json.loads(
                     (root / f"update-manifest-456-{mode}.json").read_text()
                 )
-                self.assertEqual(
-                    record["diagnostics_enabled"], mode == "texture-deferral"
-                )
+                self.assertEqual(record["diagnostics_enabled"], False)
                 self.assertEqual(record["range_cache_enabled"], enabled == "1")
 
     def test_reference_rejects_modified_package_before_replacement(self):

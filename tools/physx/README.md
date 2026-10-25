@@ -3,7 +3,7 @@
 The supported configuration uses the 32-bit CUDA proxy and Windows 64-bit server.
 Texture destruction deferral, retention across transfers, and the allocation-range
 cache are enabled by the installer. Host transfers use the original owned buffers.
-HIP itself is unchanged. Diagnostic counters remain available and enabled by the
+HIP itself is unchanged. Diagnostic counters remain available but are disabled by the
 current installer; kernel classification never permits skipping a cleanup barrier.
 
 Use [PUSH_BUILD.md](PUSH_BUILD.md) for the single push/build/install entry point.
@@ -31,3 +31,16 @@ Existing migration support is retained for devices that still have a native wrap
 `Codex History/` contains historical measurements and session notes, not current
 installation instructions. Reported FPS are observations, not controlled evidence
 of the improvement from an individual optimization.
+
+## Texture metadata IPC prototype
+
+`ZLUDA_PHYSX_TEXREF_CACHE=1` enables a 64-handle proxy cache of successful format
+and flag setters. An exact repeat returns the previous successful result without
+an IPC round trip. Changed values and misses always call the native setter.
+Errors, context/lifetime changes and unknown opcodes clear the cache. Address
+binds and synchronization still execute; no writes are deferred to a later launch.
+This relies on the supported single-device Windows bridge and its host-only HIP
+metadata setters, not a general guarantee for arbitrary CUDA implementations.
+The installer enables it for modified/default and disables it for the reference.
+No measured FPS improvement is established. The diagnostic-work gate is also in
+this pending build, so a whole-build comparison does not isolate the two changes.

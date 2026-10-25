@@ -240,6 +240,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:RUNNER_TEMP/range-cache-tests.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test texture metadata cache
+        shell: pwsh
+        run: |
+          rustc --edition=2021 --test zluda32/src/texture_metadata.rs -o "$env:RUNNER_TEMP/texture-metadata-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP/texture-metadata-tests.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build matching 32-bit proxy
         shell: pwsh
         run: |
@@ -253,9 +260,9 @@ jobs:
             "Commit: $env:GITHUB_SHA"
             "Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
             "Target: x86_64-pc-windows-msvc; profile: release; Cargo.lock: --locked"
-            "Configuration: windows-original-transfers-v1"
+            "Configuration: windows-texref-cache-v1"
             "Control: features omitted; diagnostic: physx-texture-reuse enabled"
-            "Current installation: texture deferral and transfer deferral ON, range cache ON, diagnostics ON; Windows server with original owned transfer serialization. Pool removed."
+            "Current installation: texture deferral and transfer deferral ON, range cache ON, diagnostics OFF; Windows server with original owned transfer serialization. Pool removed."
             (rustc --version)
             (cargo --version)
             ""

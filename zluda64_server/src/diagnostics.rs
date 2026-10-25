@@ -126,6 +126,13 @@ impl Recorder {
     }
 }
 
+/// Gate diagnostic preparation as well as output. In particular, callers must
+/// not build shadow histories or parse PTX when no recorder is active.
+/// A recorder disabled by an I/O error also disables further observation work.
+pub fn enabled() -> bool {
+    RECORDER.with(|recorder| recorder.borrow().is_some())
+}
+
 pub struct Timer {
     name: &'static str,
     start: Option<Instant>,
@@ -187,6 +194,26 @@ mod tests {
         assert_eq!(std::fs::read(&launcher).unwrap(), b"preserve-existing-data");
         std::fs::remove_file(launcher).unwrap();
         std::fs::remove_file(game).unwrap();
+    }
+
+    #[test]
+    fn observation_gate_disables_after_output_failure() {
+        let saved = RECORDER.with(|slot| slot.replace(None));
+        assert!(!enabled());
+        let path = std::env::temp_dir().join(format!("zluda-read-only-test-{}.csv", std::process::id()));
+        let file = OpenOptions::new().write(true).create_new(true).open(&path).unwrap();
+        drop(file);
+        // A read-only file forces the next window flush to fail, portably.
+        let origin = Instant::now() - Duration::from_secs(6);
+        RECORDER.with(|slot| slot.replace(Some(Recorder {
+            file: File::open(&path).unwrap(), origin, window: origin,
+            stats: BTreeMap::new(),
+        })));
+        assert!(enabled());
+        Timer::start("failed-output").finish(0);
+        assert!(!enabled());
+        RECORDER.with(|slot| slot.replace(saved));
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]

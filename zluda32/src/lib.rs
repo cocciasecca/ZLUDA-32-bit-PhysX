@@ -16,6 +16,7 @@ use zluda_server_common::*;
 
 mod ipc;
 mod range_cache;
+mod texture_metadata;
 
 macro_rules! not_implemented {
     ($($abi:literal fn $fn_name:ident( $($arg_id:ident : $arg_type:ty),* ) -> $ret_type:ty;)*) => {
@@ -877,14 +878,8 @@ pub(crate) fn cu_tex_ref_set_flags(
     tex_ref: CUtexref,
     flags: ::core::ffi::c_uint,
 ) -> Result<(), CUerror> {
-    GlobalState::remote_call_zero_copy::<cuTexRefSetFlagsOut>(
-        Opcode::cuTexRefSetFlags,
-        cuTexRefSetFlagsIn {
-            hTexRef: CudaEncode::encode(tex_ref),
-            Flags: flags,
-        },
-    )?;
-    Ok(())
+    let mut state = GlobalState::get()?.lock().map_err(|_| CUerror::UNKNOWN)?;
+    state.server.texture_flags(CudaEncode::encode(tex_ref).to_native(), flags)
 }
 
 pub(crate) fn cu_tex_ref_set_format(
@@ -892,15 +887,10 @@ pub(crate) fn cu_tex_ref_set_format(
     fmt: CUarray_format,
     num_packed_components: ::core::ffi::c_int,
 ) -> Result<(), CUerror> {
-    GlobalState::remote_call_zero_copy::<cuTexRefSetFormatOut>(
-        Opcode::cuTexRefSetFormat,
-        cuTexRefSetFormatIn {
-            hTexRef: CudaEncode::encode(tex_ref),
-            fmt: fmt.0.into(),
-            NumPackedComponents: num_packed_components,
-        },
-    )?;
-    Ok(())
+    let mut state = GlobalState::get()?.lock().map_err(|_| CUerror::UNKNOWN)?;
+    state.server.texture_format(
+        CudaEncode::encode(tex_ref).to_native(), fmt.0, num_packed_components,
+    )
 }
 
 pub(crate) fn cu_tex_ref_set_max_anisotropy(

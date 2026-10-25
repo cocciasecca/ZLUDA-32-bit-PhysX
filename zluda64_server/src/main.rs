@@ -337,7 +337,7 @@ fn main() -> std::io::Result<()> {
     unsafe { WaitForSingleObject(*local.event, INFINITE) };
     loop {
         #[cfg(feature = "physx-texture-reuse")]
-        if remote.shared_memory.read_header() != 0 {
+        if diagnostics::enabled() && remote.shared_memory.read_header() != 0 {
             diagnostics::count("shadow/error_reset", state.texture_shadow.reset());
         }
         let opcode = local.shared_memory.read_header();
@@ -489,7 +489,9 @@ fn main() -> std::io::Result<()> {
             }
             Some(Opcode::cuTexRefSetAddress_v2) => {
                 #[cfg(feature = "physx-diagnostics")]
-                let name = {
+                let name = if !diagnostics::enabled() {
+                    std::any::type_name::<cuTexRefSetAddress_v2In>()
+                } else {
                     let input: ArchivedcuTexRefSetAddress_v2In = local.shared_memory.read_body();
                     #[cfg(feature = "physx-texture-reuse")]
                     if state.texture_reuse.as_ref().is_some_and(|cache| {
@@ -988,23 +990,22 @@ fn cu_tex_ref_set_address_v2(
     #[cfg(not(feature = "physx-texture-reuse"))]
     let byte_offset =
         texture_address_native(&state.handles, &state.devmemory, handle, pointer, bytes)?;
-    #[cfg(feature = "physx-texture-reuse")]
-    {
-        diagnostics::count("shadow/address_observed", 1);
-        if pointer == 0 {
-            diagnostics::count("shadow/unbind_observed", 1);
-        }
-    }
-    #[cfg(feature = "physx-texture-reuse")]
-    if let Some(event) = state.texture_shadow.address(handle, pointer, bytes) {
-        diagnostics::count(event, 1);
-    }
     #[cfg(feature = "physx-diagnostics")]
-    state.texture_history.succeeded(
-        input.hTexRef.to_native(),
-        input.dptr.to_native(),
-        input.bytes.to_native(),
-    );
+    if diagnostics::enabled() {
+        #[cfg(feature = "physx-texture-reuse")]
+        {
+            diagnostics::count("shadow/address_observed", 1);
+            if pointer == 0 {
+                diagnostics::count("shadow/unbind_observed", 1);
+            }
+            if let Some(event) = state.texture_shadow.address(handle, pointer, bytes) {
+                diagnostics::count(event, 1);
+            }
+        }
+        state.texture_history.succeeded(
+            input.hTexRef.to_native(), input.dptr.to_native(), input.bytes.to_native(),
+        );
+    }
     Ok(cuTexRefSetAddress_v2Out {
         ByteOffset: (byte_offset as u32).into(),
     })
@@ -1231,7 +1232,7 @@ fn cu_module_load_data(
     unsafe { cuModuleLoadData(&mut module, input.image.as_ptr().cast()) }?;
     unsafe { state.modules.new_module(&mut state.devmemory, module) }?;
     #[cfg(feature = "physx-texture-reuse")]
-    {
+    if diagnostics::enabled() {
         state
             .modules
             .modules
@@ -1588,57 +1589,61 @@ impl State {
             ) => Boundary::Lifetime,
             _ => Boundary::Other,
         };
-        // Shadow events are counts, never saved-time estimates or permission to skip cleanup.
-        match Opcode::from_repr(opcode) {
-            Some(Opcode::cuTexRefSetFlags | Opcode::cuTexRefSetFormat) => {
-                let event = if matches!(Opcode::from_repr(opcode), Some(Opcode::cuTexRefSetFlags)) {
-                    let input: ArchivedcuTexRefSetFlagsIn = local.shared_memory.read_body();
-                    self.texture_shadow
-                        .flags(input.hTexRef.to_native(), input.Flags.to_native())
-                } else {
-                    let input: ArchivedcuTexRefSetFormatIn = local.shared_memory.read_body();
-                    self.texture_shadow.format(
-                        input.hTexRef.to_native(),
-                        input.fmt.to_native(),
-                        input.NumPackedComponents.to_native(),
-                    )
-                };
-                if let Some(event) = event {
-                    diagnostics::count(event, 1);
+        if diagnostics::enabled() {
+            // Shadow events are counts, never saved-time estimates or permission to skip cleanup.
+            match Opcode::from_repr(opcode) {
+                Some(Opcode::cuTexRefSetFlags | Opcode::cuTexRefSetFormat) => {
+                    let event = if matches!(Opcode::from_repr(opcode), Some(Opcode::cuTexRefSetFlags)) {
+                        let input: ArchivedcuTexRefSetFlagsIn = local.shared_memory.read_body();
+                        self.texture_shadow
+                            .flags(input.hTexRef.to_native(), input.Flags.to_native())
+                    } else {
+                        let input: ArchivedcuTexRefSetFormatIn = local.shared_memory.read_body();
+                        self.texture_shadow.format(
+                            input.hTexRef.to_native(),
+                            input.fmt.to_native(),
+                            input.NumPackedComponents.to_native(),
+                        )
+                    };
+                    if let Some(event) = event {
+                        diagnostics::count(event, 1);
+                    }
                 }
-            }
-            _ if matches!(boundary, Boundary::Kernel) => {
-                let input = local.shared_memory.deserialize_body2::<cuLaunchKernelIn>();
-                let candidate = self
-                    .handles
-                    .get(input.f.to_native())
-                    .ok()
-                    .and_then(|f| self.modules.functions.get(&CUfunction(f)))
-                    .is_some_and(|f| {
-                        f.texture_usage == kernel_textures::Usage::NoTextureInstructions
-                    });
-                diagnostics::count("shadow/kernel_observed", 1);
-                if candidate {
-                    diagnostics::count("shadow/candidate_kernel_observed", 1);
-                    diagnostics::count(
-                        "shadow/pending_at_candidate",
-                        self.texture_shadow.pending(),
-                    );
+                _ if matches!(boundary, Boundary::Kernel) => {
+                    let input = local.shared_memory.deserialize_body2::<cuLaunchKernelIn>();
+                    let candidate = self
+                        .handles
+                        .get(input.f.to_native())
+                        .ok()
+                        .and_then(|f| self.modules.functions.get(&CUfunction(f)))
+                        .is_some_and(|f| {
+                            f.texture_usage == kernel_textures::Usage::NoTextureInstructions
+                        });
+                    diagnostics::count("shadow/kernel_observed", 1);
+                    if candidate {
+                        diagnostics::count("shadow/candidate_kernel_observed", 1);
+                        diagnostics::count(
+                            "shadow/pending_at_candidate",
+                            self.texture_shadow.pending(),
+                        );
+                    }
+                    diagnostics::count("shadow/kernel_end", self.texture_shadow.boundary(candidate));
                 }
-                diagnostics::count("shadow/kernel_end", self.texture_shadow.boundary(candidate));
+                _ if !texture_reuse::can_defer(boundary, self.retain_textures_across_transfers) => {
+                    diagnostics::count("shadow/other_boundary_end", self.texture_shadow.reset());
+                }
+                _ => (),
             }
-            _ if !texture_reuse::can_defer(boundary, self.retain_textures_across_transfers) => {
-                diagnostics::count("shadow/other_boundary_end", self.texture_shadow.reset());
-            }
-            _ => (),
         }
         // Copies/memsets use allocation addresses and do not observe texture
         // bindings. They still execute normally, including existing syncs.
+        // These cleanup decisions are independent of diagnostic observation.
         // Kernels, frees, unloads and all unknown requests ALWAYS drain first.
         if texture_reuse::can_defer(boundary, self.retain_textures_across_transfers) {
             return Ok(());
         }
-        let kernel_drain_label = if matches!(boundary, Boundary::Kernel)
+        let kernel_drain_label = if diagnostics::enabled()
+            && matches!(boundary, Boundary::Kernel)
             && self.texture_reuse.as_ref().is_some_and(|c| c.has_pending())
         {
             // Input is framed: use the same deserializer as normal dispatch.

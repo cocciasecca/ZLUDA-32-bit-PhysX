@@ -1,0 +1,585 @@
+{
+  "started_utc": "2026-10-25T21:08:33Z",
+  "duration_seconds": 30.000080843000433,
+  "complete": true,
+  "stopped_reason": null,
+  "processes": {
+    "game": {
+      "pid": 25602,
+      "flags": {
+        "ZLUDA_PHYSX_TEXTURE_REUSE": "0",
+        "ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS": "0",
+        "ZLUDA_PHYSX_RANGE_CACHE": "0",
+        "ZLUDA_PHYSX_DIAGNOSTICS": "<unset>"
+      },
+      "loaded_file_hashes": {
+        "/home/deck/.local/share/Steam/steamapps/compatdata/35140/pfx/drive_c/windows/syswow64/nvcuda.dll": "ef74c5bb88b90c4d8154c4c1dcd477ae58b31e4f9aaf2dfa4b01b448dfec5b2c"
+      }
+    },
+    "server": {
+      "pid": 25649,
+      "flags": {
+        "ZLUDA_PHYSX_TEXTURE_REUSE": "0",
+        "ZLUDA_PHYSX_TEXTURE_REUSE_TRANSFERS": "0",
+        "ZLUDA_PHYSX_RANGE_CACHE": "0",
+        "ZLUDA_PHYSX_DIAGNOSTICS": "<unset>"
+      },
+      "loaded_file_hashes": {
+        "/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/zluda-libs/libamdhip64.so.7": "c05034a11d50afe17287f191db2c0c587b9d35cb53d8cda5933705f4dab2047c",
+        "/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/zluda/nvcuda.dll": "3d9b46c4b43bfefebf41271a2cd68aee32ef6d870fcadf4a431fb103cecbe1a9",
+        "/home/deck/.local/share/Steam/compatibilitytools.d/ZludaProton-Experiment/zluda/zluda64_server.exe": "7090a770a3010b7980ee28f999c244831bfd904b59d5207c33cc92e8663a250b"
+      }
+    }
+  },
+  "sensor_labels": {
+    "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": "edge",
+    "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": "PPT",
+    "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": "sclk"
+  },
+  "mean_cpu_percent": {
+    "game": 54.39985633652751,
+    "server": 81.36644843206362
+  },
+  "samples": [
+    {
+      "seconds": 1.0000713839999662,
+      "cpu_percent": {
+        "game": 53.996145539148664,
+        "server": 79.99428968762766
+      },
+      "server_thread_cpu_percent": {
+        "25649": 79.99428968762766,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 13023000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 800000000
+      }
+    },
+    {
+      "seconds": 2.000092579000011,
+      "cpu_percent": {
+        "game": 52.998876688806206,
+        "server": 81.99826204683224
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99828324138308,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12785000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 938000000
+      }
+    },
+    {
+      "seconds": 3.000069569000516,
+      "cpu_percent": {
+        "game": 56.00128858962218,
+        "server": 82.00188686337532
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.00186385284637,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12648000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 941000000
+      }
+    },
+    {
+      "seconds": 4.000091666000117,
+      "cpu_percent": {
+        "game": 52.9988288848993,
+        "server": 80.99821018258194
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.99818808607058,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 53000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 23244000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 944000000
+      }
+    },
+    {
+      "seconds": 5.00010536300033,
+      "cpu_percent": {
+        "game": 52.999274068931776,
+        "server": 80.99889055817877
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99889055817877,
+        "25650": 0.9999863031873921,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 13128000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 917000000
+      }
+    },
+    {
+      "seconds": 6.000080780000644,
+      "cpu_percent": {
+        "game": 55.001352098221346,
+        "server": 82.00201585553
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.00199127192597,
+        "25650": 1.0000245836040245,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 53000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 23017000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 916000000
+      }
+    },
+    {
+      "seconds": 7.000101323000308,
+      "cpu_percent": {
+        "game": 57.998808530495836,
+        "server": 80.99833605120972
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.99831550863205,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12815000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 967000000
+      }
+    },
+    {
+      "seconds": 8.000069863000135,
+      "cpu_percent": {
+        "game": 56.0017618154364,
+        "server": 82.00257980117472
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.0025483401848,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 53000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 16398000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 958000000
+      }
+    },
+    {
+      "seconds": 9.000072314000136,
+      "cpu_percent": {
+        "game": 53.99986764632438,
+        "server": 80.99980146948657
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99980146948657,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 13195000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 919000000
+      }
+    },
+    {
+      "seconds": 10.00008932899982,
+      "cpu_percent": {
+        "game": 52.99909822036049,
+        "server": 80.99862180847546
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99862180847546,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12409000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 890000000
+      }
+    },
+    {
+      "seconds": 11.000069306000114,
+      "cpu_percent": {
+        "game": 55.00110128703491,
+        "server": 82.00164191885206
+      },
+      "server_thread_cpu_percent": {
+        "25649": 82.00164191885206,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 11984000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 916000000
+      }
+    },
+    {
+      "seconds": 12.000102710000647,
+      "cpu_percent": {
+        "game": 55.99812943845441,
+        "server": 80.99729436633584
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99729436633584,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 13125000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 800000000
+      }
+    },
+    {
+      "seconds": 13.000066188000346,
+      "cpu_percent": {
+        "game": 54.00197226004712,
+        "server": 81.00295839007067
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.00295839007067,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 14697000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 852000000
+      }
+    },
+    {
+      "seconds": 14.000069059999987,
+      "cpu_percent": {
+        "game": 53.99984491246481,
+        "server": 81.99976449670582
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99976736869722,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12502000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 939000000
+      }
+    },
+    {
+      "seconds": 15.000101521000033,
+      "cpu_percent": {
+        "game": 55.998182243003626,
+        "server": 81.99733828439815
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.99733828439815,
+        "25650": 0.9999675400536362,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12053000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 932000000
+      }
+    },
+    {
+      "seconds": 16.000069851000262,
+      "cpu_percent": {
+        "game": 53.00167856314797,
+        "server": 82.00259702222891
+      },
+      "server_thread_cpu_percent": {
+        "25649": 82.00259702222891,
+        "25650": 1.0000316710027917,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12231000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 909000000
+      }
+    },
+    {
+      "seconds": 17.000104978999843,
+      "cpu_percent": {
+        "game": 55.99803290112371,
+        "server": 80.9971547319825
+      },
+      "server_thread_cpu_percent": {
+        "25649": 79.99718985874816,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12746000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 857000000
+      }
+    },
+    {
+      "seconds": 18.00007013100003,
+      "cpu_percent": {
+        "game": 56.0019515559974,
+        "server": 81.00282278635338
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.00282278635338,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 29518000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 968000000
+      }
+    },
+    {
+      "seconds": 19.000088079000307,
+      "cpu_percent": {
+        "game": 53.99903082537979,
+        "server": 80.99854623806968
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99854623806968,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 27320000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 982000000
+      }
+    },
+    {
+      "seconds": 20.000086941000518,
+      "cpu_percent": {
+        "game": 53.00006031405744,
+        "server": 82.00009331608885
+      },
+      "server_thread_cpu_percent": {
+        "25649": 82.00009331608885,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12483000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 957000000
+      }
+    },
+    {
+      "seconds": 21.000105709999843,
+      "cpu_percent": {
+        "game": 53.99898649305894,
+        "server": 81.99846097094135
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99847973958842,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12372000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 941000000
+      }
+    },
+    {
+      "seconds": 22.000072696000643,
+      "cpu_percent": {
+        "game": 54.00178281481466,
+        "server": 81.002674222222
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.002674222222,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 53000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 16496000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 867000000
+      }
+    },
+    {
+      "seconds": 23.00012030400012,
+      "cpu_percent": {
+        "game": 54.997381684681535,
+        "server": 80.99614393562189
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99614393562189,
+        "25650": 0.9999523942669367,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 19491000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 955000000
+      }
+    },
+    {
+      "seconds": 24.000094166000054,
+      "cpu_percent": {
+        "game": 57.00148990494692,
+        "server": 81.00211723334564
+      },
+      "server_thread_cpu_percent": {
+        "25649": 82.00214337202891,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 11128000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 923000000
+      }
+    },
+    {
+      "seconds": 25.0000743340006,
+      "cpu_percent": {
+        "game": 53.00105111681673,
+        "server": 81.00160642381425
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.00160642381425,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 11913000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 920000000
+      }
+    },
+    {
+      "seconds": 26.000102576000245,
+      "cpu_percent": {
+        "game": 52.99850321629105,
+        "server": 82.99765598022937
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99771246263349,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 12554000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 985000000
+      }
+    },
+    {
+      "seconds": 27.000068129000283,
+      "cpu_percent": {
+        "game": 53.00182575388972,
+        "server": 80.00275585492788
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.00279030311448,
+        "25650": 1.0000344481865986,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 53000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 22870000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 863000000
+      }
+    },
+    {
+      "seconds": 28.00010609400033,
+      "cpu_percent": {
+        "game": 53.99794996782694,
+        "server": 81.99688698818164
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99692495174043,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 15595000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 992000000
+      }
+    },
+    {
+      "seconds": 29.000066223999966,
+      "cpu_percent": {
+        "game": 55.002192937452456,
+        "server": 81.00322959879362
+      },
+      "server_thread_cpu_percent": {
+        "25649": 81.00322959879362,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 69,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 53000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 13584000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 885000000
+      }
+    },
+    {
+      "seconds": 30.000080843000433,
+      "cpu_percent": {
+        "game": 51.999239823088736,
+        "server": 80.99881587827285
+      },
+      "server_thread_cpu_percent": {
+        "25649": 80.99881587827285,
+        "25650": 0.0,
+        "25651": 0.0
+      },
+      "sensors_raw": {
+        "/sys/class/drm/card0/device/gpu_busy_percent": 70,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": 52000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": 10642000,
+        "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": 800000000
+      }
+    }
+  ]
+}

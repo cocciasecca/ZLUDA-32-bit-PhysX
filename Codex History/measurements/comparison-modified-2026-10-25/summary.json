@@ -1,0 +1,50 @@
+{
+  "duration_seconds": 45.00008542600017,
+  "cpu_percent_one_core_100": {
+    "game": 49.73323950960484,
+    "server": 0.0
+  },
+  "sensors": {
+    "/sys/class/drm/card0/device/gpu_busy_percent": {
+      "mean": 40.977777777777774,
+      "min": 39,
+      "max": 43,
+      "label": null
+    },
+    "/sys/class/drm/card0/device/hwmon/hwmon7/temp1_input": {
+      "mean": 54377.77777777778,
+      "min": 54000,
+      "max": 55000,
+      "label": "edge"
+    },
+    "/sys/class/drm/card0/device/hwmon/hwmon7/power1_input": {
+      "mean": 14523377.777777778,
+      "min": 7006000,
+      "max": 18348000,
+      "label": "PPT"
+    },
+    "/sys/class/drm/card0/device/hwmon/hwmon7/freq1_input": {
+      "mean": 800000000,
+      "min": 800000000,
+      "max": 800000000,
+      "label": "sclk"
+    }
+  },
+  "server_threads": {
+    "19795": 0.0,
+    "19793": 0.0,
+    "19794": 0.0
+  },
+  "user_reported_fps": {
+    "reference": {
+      "mean_approx": 25,
+      "minimum_observed": 21
+    },
+    "modified": {
+      "mean_approx": 28,
+      "minimum_observed": 20
+    },
+    "method": "Manual camera spin; not a frame-time capture or controlled repeated benchmark"
+  },
+  "interpretation": "Server CPU delta was zero during the capture. Do not use this window as evidence of active CUDA workload performance. Await gameplay/pause confirmation."
+}
