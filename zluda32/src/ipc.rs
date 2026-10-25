@@ -12,10 +12,9 @@ use windows::Win32::System::Threading::*;
 use zluda_server_common::{Opcode, Serializer};
 
 pub(crate) struct Server {
-    local: Option<zluda_server_common::Endpoint>,
-    remote: Option<zluda_server_common::Endpoint>,
-    _child: Option<Child>,
-    native: Option<crate::native_backend::Client>,
+    local: zluda_server_common::Endpoint,
+    remote: zluda_server_common::Endpoint,
+    _child: Child,
     arena: stumpalo::Arena,
     range_cache: crate::range_cache::RangeCache,
     range_cache_enabled: bool,
@@ -26,20 +25,6 @@ pub(crate) struct Server {
 
 impl Server {
     pub unsafe fn start() -> Result<Self, Error> {
-        if crate::native_backend::enabled() {
-            return Ok(Self {
-                local: None,
-                remote: None,
-                _child: None,
-                native: Some(crate::native_backend::Client::connect()?),
-                arena: stumpalo::Arena::new(),
-                range_cache: Default::default(),
-                range_cache_enabled: env::var("ZLUDA_PHYSX_RANGE_CACHE").as_deref() == Ok("1"),
-                range_queries: 0,
-                range_hits: 0,
-                range_log: None,
-            });
-        }
         let local = zluda_server_common::Endpoint::new()?;
         let remote = zluda_server_common::Endpoint::new()?;
         let spawn_server = |path: &PathBuf| {
@@ -96,10 +81,9 @@ impl Server {
             Some(file)
         });
         Ok(Server {
-            local: Some(local),
-            remote: Some(remote),
-            _child: Some(child),
-            native: None,
+            local,
+            remote,
+            _child: child,
             arena,
             range_cache: Default::default(),
             range_cache_enabled,
@@ -191,33 +175,10 @@ impl Server {
         data: impl for<'a, 'b> Serialize<Serializer<'a, 'b>>,
     ) -> Result<Out, CUerror> {
         self.prepare_range_cache(&opcode);
-        if let Some(native) = self.native.as_mut() {
-            let result = native.fixed::<Out>(opcode, data);
-            if result.is_err() {
-                self.invalidate_ranges();
-            }
-            return result;
-        }
-
-        self.remote
-            .as_mut()
-            .unwrap()
-            .shared_memory
-            .write_header(opcode as u32);
-        self.remote
-            .as_mut()
-            .unwrap()
-            .shared_memory
-            .write_body(&data);
-        unsafe {
-            SignalObjectAndWait(
-                *self.remote.as_ref().unwrap().event,
-                *self.local.as_ref().unwrap().event,
-                INFINITE,
-                false,
-            )
-        };
-        let return_value = self.local.as_mut().unwrap().shared_memory.read_header();
+        self.remote.shared_memory.write_header(opcode as u32);
+        self.remote.shared_memory.write_body(&data);
+        unsafe { SignalObjectAndWait(*self.remote.event, *self.local.event, INFINITE, false) };
+        let return_value = self.local.shared_memory.read_header();
         match NonZeroU32::new(return_value) {
             None => Ok(()),
             Some(code) => {
@@ -225,7 +186,7 @@ impl Server {
                 Err(CUerror(code))
             }
         }?;
-        Ok(self.local.as_mut().unwrap().shared_memory.read_body())
+        Ok(self.local.shared_memory.read_body())
     }
 
     pub(crate) fn remote_call_framed_in<Out: Portable + Clone>(
@@ -234,44 +195,19 @@ impl Server {
         data: impl for<'a, 'b> Serialize<Serializer<'a, 'b>>,
     ) -> Result<Out, CUerror> {
         self.prepare_range_cache(&opcode);
-        if let Some(native) = self.native.as_mut() {
-            let result = native.framed_in::<Out>(opcode, data, &mut self.arena);
-            if result.is_err() {
-                self.invalidate_ranges();
-            }
-            return result;
-        }
-
         let opcode = opcode as u32;
-        self.remote
-            .as_mut()
-            .unwrap()
-            .shared_memory
-            .write_header(opcode);
+        self.remote.shared_memory.write_header(opcode);
         let old_shmem = self
             .remote
-            .as_mut()
-            .unwrap()
             .shared_memory
             .serialize_body(&mut self.arena, &data)?;
         if let Some(mut old_shmem) = old_shmem {
-            self.remote
-                .as_mut()
-                .unwrap()
-                .shared_memory
-                .write_header(opcode);
+            self.remote.shared_memory.write_header(opcode);
             old_shmem.write_header(u32::MAX);
-            old_shmem.write_buffer(self.remote.as_mut().unwrap().shared_memory.name.as_bytes());
+            old_shmem.write_buffer(self.remote.shared_memory.name.as_bytes());
         }
-        unsafe {
-            SignalObjectAndWait(
-                *self.remote.as_ref().unwrap().event,
-                *self.local.as_ref().unwrap().event,
-                INFINITE,
-                false,
-            )
-        };
-        let return_value = self.local.as_mut().unwrap().shared_memory.read_header();
+        unsafe { SignalObjectAndWait(*self.remote.event, *self.local.event, INFINITE, false) };
+        let return_value = self.local.shared_memory.read_header();
         match NonZeroU32::new(return_value) {
             None => Ok(()),
             Some(code) => {
@@ -279,7 +215,7 @@ impl Server {
                 Err(CUerror(code))
             }
         }?;
-        Ok(self.local.as_mut().unwrap().shared_memory.read_body())
+        Ok(self.local.shared_memory.read_body())
     }
 
     pub(crate) fn remote_call_framed_out<Out: Archive>(
@@ -291,49 +227,19 @@ impl Server {
         <Out as Archive>::Archived: Deserialize<Out, Strategy<(), Failure>>,
     {
         self.prepare_range_cache(&opcode);
-        if let Some(native) = self.native.as_mut() {
-            let result = native.framed_out::<Out>(opcode, data);
-            if result.is_err() {
-                self.invalidate_ranges();
-            }
-            return result;
-        }
-
-        self.remote
-            .as_mut()
-            .unwrap()
-            .shared_memory
-            .write_header(opcode as u32);
-        self.remote
-            .as_mut()
-            .unwrap()
-            .shared_memory
-            .write_body(&data);
-        unsafe {
-            SignalObjectAndWait(
-                *self.remote.as_ref().unwrap().event,
-                *self.local.as_ref().unwrap().event,
-                INFINITE,
-                false,
-            )
-        };
-        let mut return_value = self.local.as_mut().unwrap().shared_memory.read_header();
+        self.remote.shared_memory.write_header(opcode as u32);
+        self.remote.shared_memory.write_body(&data);
+        unsafe { SignalObjectAndWait(*self.remote.event, *self.local.event, INFINITE, false) };
+        let mut return_value = self.local.shared_memory.read_header();
         if return_value == u32::MAX {
             let new_shmem_name = unsafe {
-                String::from_utf8_unchecked(
-                    self.local
-                        .as_mut()
-                        .unwrap()
-                        .shared_memory
-                        .read_buffer()
-                        .to_vec(),
-                )
+                String::from_utf8_unchecked(self.local.shared_memory.read_buffer().to_vec())
             };
             let new_shmem =
                 unsafe { zluda_server_common::SharedMemory::open(new_shmem_name, None) }
                     .map_err(|_| CUerror::MAP_FAILED)?;
-            self.local.as_mut().unwrap().shared_memory = new_shmem;
-            return_value = self.local.as_mut().unwrap().shared_memory.read_header();
+            self.local.shared_memory = new_shmem;
+            return_value = self.local.shared_memory.read_header();
         }
         match NonZeroU32::new(return_value) {
             None => Ok(()),
@@ -342,11 +248,7 @@ impl Server {
                 Err(CUerror(code))
             }
         }?;
-        self.local
-            .as_mut()
-            .unwrap()
-            .shared_memory
-            .deserialize_body()
+        self.local.shared_memory.deserialize_body()
     }
 }
 

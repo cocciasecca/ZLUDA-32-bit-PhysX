@@ -14,58 +14,6 @@ env:
   AMDGPU_VERSION: "31.20"
 
 jobs:
-  native-linux:
-    name: Build native Linux PhysX backend
-    if: github.ref == 'refs/heads/experiment/physx-diagnostics'
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read
-    env:
-      RUSTC_WRAPPER: ""
-      CMAKE_BUILD_PARALLEL_LEVEL: "3"
-    steps:
-      - uses: jlumbroso/free-disk-space@v1.3.1
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
-          submodules: recursive
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-      - name: Install native build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build cmake clang
-          sudo bash .github/workflows/rocm_setup_build.sh 7.2.4
-      - name: Identify native compiler cache
-        id: native-cache
-        run: |
-          echo "llvm=$(git -C ext/llvm-project rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "rust=$(rustc --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache/restore@v4
-        id: llvm-cache
-        with:
-          path: target/release/build/llvm_zluda-*
-          key: native-llvm-${{ runner.os }}-${{ steps.native-cache.outputs.rust }}-${{ steps.native-cache.outputs.llvm }}-${{ hashFiles('llvm_zluda/build.rs', 'llvm_zluda/Cargo.toml') }}
-      - name: Test native wire buffers and framing
-        run: cargo test --locked --release -p zluda_server_common --lib
-      - name: Build ZLUDA and full native PhysX server
-        id: native-build
-        run: cargo build --locked --release -p zluda -p zluda64_server --features zluda64_server/physx-texture-reuse
-      - uses: actions/cache/save@v4
-        if: ${{ !cancelled() && steps.native-build.outcome != 'skipped' && steps.llvm-cache.outputs.cache-hit != 'true' }}
-        with:
-          path: target/release/build/llvm_zluda-*
-          key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
-      - name: Package native backend
-        run: python3 tools/physx/native/package_native.py --output native-artifacts --revision "$GITHUB_SHA"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: physx-native-${{ github.sha }}
-          path: native-artifacts/
-          if-no-files-found: error
-          retention-days: 14
-
   build_linux:
     if: github.ref != 'refs/heads/experiment/physx-diagnostics'
     name: Build (Linux)
@@ -254,7 +202,7 @@ jobs:
         with:
           toolchain: stable
           target: x86_64-pc-windows-msvc,i686-pc-windows-msvc
-      - name: Test native installer and process lifecycle
+      - name: Test archived installer and runtime helpers
         run: python -B -m unittest discover -s tools/physx/native -p "test_*.py"
       - name: Test portable diagnostic aggregation
         shell: pwsh
@@ -292,20 +240,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:RUNNER_TEMP/range-cache-tests.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test borrowed transfer wire compatibility
+        shell: pwsh
+        run: |
+          cargo test --locked --release -p zluda_server_common --lib --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build matching 32-bit proxy
         shell: pwsh
         run: |
           cargo build --locked --release -p zluda32 --target i686-pc-windows-msvc
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item target/i686-pc-windows-msvc/release/nvcuda.dll artifacts/32/
-      - name: Test actual 32-bit DLL native transport
-        shell: pwsh
-        run: |
-          rustc --edition=2021 -D warnings -O --target i686-pc-windows-msvc tools/physx/native/dll_probe.rs -o artifacts/32/native-dll-probe.exe
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $env:ZLUDA_TEST_SHA = (git rev-parse HEAD)
-          cargo run --locked --release -p zluda_server_common --example native_dll_test --target x86_64-pc-windows-msvc -- artifacts/32/nvcuda.dll artifacts/32/native-dll-probe.exe
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Record provenance and usage
         shell: pwsh
         run: |
@@ -313,13 +258,13 @@ jobs:
             "Commit: $env:GITHUB_SHA"
             "Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
             "Target: x86_64-pc-windows-msvc; profile: release; Cargo.lock: --locked"
-            "Configuration: native-linux-physx-v1"
+            "Configuration: windows-borrowed-transfers-v1"
             "Control: features omitted; diagnostic: physx-texture-reuse enabled"
-            "Native Linux candidate: complete shared dispatcher, texture deferral and range cache retained. GPU preflight required before activation."
+            "Current installation: texture deferral and transfer deferral ON, range cache ON, diagnostics ON; Windows server with borrowed host transfer serialization. Pool removed."
             (rustc --version)
             (cargo --version)
             ""
-            "Matching 32-bit proxy and Windows fallback servers. Install with the same-revision physx-native artifact and tools/physx/push_build.py."
+            "Experimental servers and matching 32-bit proxy, not a complete Proton tool."
             "Install 32/nvcuda.dll together with either server: their embedded Git revisions MUST match. Keep the original v7-preview.15 64-bit nvcuda.dll in a SEPARATE experimental tool."
             "Preserve the original tool, prefix, saves and working COMGR library."
             "For the diagnostic server set ZLUDA_PHYSX_DIAGNOSTICS to a NEW Wine-visible CSV base path (server adds .pid-N.csv)."

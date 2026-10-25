@@ -1,5 +1,5 @@
 // Prevent the console window from appearing when running the server on Windows
-#![cfg_attr(windows, windows_subsystem = "windows")]
+#![windows_subsystem = "windows"]
 
 #[cfg(feature = "physx-diagnostics")]
 mod diagnostics;
@@ -29,10 +29,7 @@ use std::{
     ptr,
     rc::Rc,
 };
-#[cfg(windows)]
 use windows::Win32::System::Threading::*;
-#[cfg(target_os = "linux")]
-mod native_host;
 use zluda_server_common::*;
 
 struct State {
@@ -315,7 +312,6 @@ impl State {
     }
 }
 
-#[cfg(windows)]
 fn main() -> std::io::Result<()> {
     let args = std::env::args();
     let mut args = args.skip(1);
@@ -323,21 +319,13 @@ fn main() -> std::io::Result<()> {
     let remote_shared_memory = args.next().unwrap();
     let local_event = args.next().unwrap();
     let local_shared_memory = args.next().unwrap();
-    let remote = unsafe { Endpoint::open(remote_event, remote_shared_memory) }.map_err(|_| {
-        std::io::Error::new(std::io::ErrorKind::Other, "Failed to open remote endpoint")
-    })?;
-    let local = unsafe { Endpoint::open(local_event, local_shared_memory) }.map_err(|_| {
+    let mut remote =
+        unsafe { Endpoint::open(remote_event, remote_shared_memory) }.map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::Other, "Failed to open remote endpoint")
+        })?;
+    let mut local = unsafe { Endpoint::open(local_event, local_shared_memory) }.map_err(|_| {
         std::io::Error::new(std::io::ErrorKind::Other, "Failed to open local endpoint")
     })?;
-    run(local, remote)
-}
-
-#[cfg(target_os = "linux")]
-fn main() -> std::io::Result<()> {
-    native_host::entry(run)
-}
-
-fn run(mut local: Endpoint, mut remote: Endpoint) -> std::io::Result<()> {
     let mut state = State::new().map_err(|_| {
         std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -346,18 +334,13 @@ fn run(mut local: Endpoint, mut remote: Endpoint) -> std::io::Result<()> {
     })?;
     let mut arena = stumpalo::Arena::new();
     write_git_version(&mut remote)?;
-    wait_for_request(&mut local, &mut remote);
+    unsafe { WaitForSingleObject(*local.event, INFINITE) };
     loop {
-        #[cfg(target_os = "linux")]
-        if local.disconnected {
-            return Ok(());
-        }
         #[cfg(feature = "physx-texture-reuse")]
         if remote.shared_memory.read_header() != 0 {
             diagnostics::count("shadow/error_reset", state.texture_shadow.reset());
         }
         let opcode = local.shared_memory.read_header();
-        #[cfg(windows)]
         if opcode == u32::MAX {
             let new_shmem_name =
                 unsafe { String::from_utf8_unchecked(local.shared_memory.read_buffer().to_vec()) };
@@ -368,7 +351,7 @@ fn run(mut local: Endpoint, mut remote: Endpoint) -> std::io::Result<()> {
         #[cfg(feature = "physx-texture-reuse")]
         if let Err(error) = state.texture_reuse_barrier(opcode, &local) {
             remote.shared_memory.write_header(error.0.get());
-            reply_and_wait(&mut local, &mut remote);
+            unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
             continue;
         }
         match Opcode::from_repr(opcode) {
@@ -692,41 +675,17 @@ fn run(mut local: Endpoint, mut remote: Endpoint) -> std::io::Result<()> {
             _ => {
                 let return_code = CUerror::NOT_SUPPORTED.0.get();
                 remote.shared_memory.write_header(return_code);
-                reply_and_wait(&mut local, &mut remote);
+                unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
             }
         }
     }
-}
-
-fn wait_for_request(local: &mut Endpoint, _remote: &mut Endpoint) {
-    #[cfg(windows)]
-    unsafe {
-        WaitForSingleObject(*local.event, INFINITE);
-    }
-    #[cfg(target_os = "linux")]
-    native_host::receive(local, _remote);
-}
-fn reply_and_wait(local: &mut Endpoint, remote: &mut Endpoint) {
-    #[cfg(windows)]
-    unsafe {
-        SignalObjectAndWait(*remote.event, *local.event, INFINITE, false);
-    }
-    #[cfg(target_os = "linux")]
-    native_host::reply(local, remote);
 }
 
 fn write_git_version(remote: &mut Endpoint) -> std::io::Result<()> {
     let git_sha = env!("VERGEN_GIT_SHA");
     remote.shared_memory.write_header(Opcode::Startup as u32);
     remote.shared_memory.write_buffer(git_sha.as_bytes());
-    #[cfg(windows)]
     unsafe { SetEvent(*remote.event) }?;
-    #[cfg(target_os = "linux")]
-    remote
-        .connection
-        .as_mut()
-        .unwrap()
-        .send(Opcode::Startup as u32, git_sha.as_bytes())?;
     Ok(())
 }
 
@@ -1198,10 +1157,6 @@ fn cu_memcpy_hto_d_async_v2(
             stream,
         )
     }?;
-    // The network receive buffer is reused by the next request. Ensure HIP has
-    // finished consuming these host bytes before allowing that reuse.
-    #[cfg(target_os = "linux")]
-    unsafe { cuStreamSynchronize(stream) }?;
     Ok(cuMemcpyHtoDAsync_v2Out {})
 }
 
@@ -1381,7 +1336,7 @@ fn cu_ctx_get_api_version(
     Ok(cuCtxGetApiVersionOut { version })
 }
 
-fn handle_cuda_function<In: rkyv::Archive + Portable, Out: Portable + for<'a, 'b> Serialize<Serializer<'a, 'b>>>(
+fn handle_cuda_function<In: rkyv::Archive + Portable, Out: Portable>(
     local: &mut Endpoint,
     remote: &mut Endpoint,
     handler: impl FnOnce(&In::Archived) -> Result<Out, CUerror>,
@@ -1389,7 +1344,7 @@ fn handle_cuda_function<In: rkyv::Archive + Portable, Out: Portable + for<'a, 'b
     handle_cuda_function_named::<In, Out>(local, remote, handler, std::any::type_name::<In>());
 }
 
-fn handle_cuda_function_named<In: rkyv::Archive + Portable, Out: Portable + for<'a, 'b> Serialize<Serializer<'a, 'b>>>(
+fn handle_cuda_function_named<In: rkyv::Archive + Portable, Out: Portable>(
     local: &mut Endpoint,
     remote: &mut Endpoint,
     handler: impl FnOnce(&In::Archived) -> Result<Out, CUerror>,
@@ -1401,18 +1356,13 @@ fn handle_cuda_function_named<In: rkyv::Archive + Portable, Out: Portable + for<
     match handler(&input) {
         Ok(output) => {
             remote.shared_memory.write_header(0);
-            #[cfg(windows)]
             remote.shared_memory.write_body(&output);
-            #[cfg(unix)]
-            if let Err(error) = remote.shared_memory.write_body(&output) {
-                remote.shared_memory.write_header(error.0.get());
-            }
         }
         Err(e) => remote.shared_memory.write_header(e.0.get()),
     }
     #[cfg(feature = "physx-diagnostics")]
     diagnostic.finish(remote.shared_memory.read_header());
-    reply_and_wait(local, remote);
+    unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
 }
 
 fn handle_cuda_function_framed_out_impl<In: Archive + Portable, Out>(
@@ -1452,10 +1402,10 @@ fn handle_cuda_function_framed_out<In: Archive + Portable, Out>(
     }
     #[cfg(feature = "physx-diagnostics")]
     diagnostic.finish(remote.shared_memory.read_header());
-    reply_and_wait(local, remote);
+    unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
 }
 
-fn handle_cuda_function_framed_in_impl<In: Archive, Out: Portable + for<'a, 'b> Serialize<Serializer<'a, 'b>>>(
+fn handle_cuda_function_framed_in_impl<In: Archive, Out: Portable>(
     local: &mut Endpoint,
     remote: &mut Endpoint,
     handler: impl FnOnce(&In::Archived) -> Result<Out, CUerror>,
@@ -1467,19 +1417,14 @@ where
     match handler(input) {
         Ok(output) => {
             remote.shared_memory.write_header(0);
-            #[cfg(windows)]
             remote.shared_memory.write_body(&output);
-            #[cfg(unix)]
-            if let Err(error) = remote.shared_memory.write_body(&output) {
-                remote.shared_memory.write_header(error.0.get());
-            }
         }
         Err(e) => remote.shared_memory.write_header(e.0.get()),
     }
     Ok(())
 }
 
-fn handle_cuda_function_framed_in<In: Archive, Out: Portable + for<'a, 'b> Serialize<Serializer<'a, 'b>>>(
+fn handle_cuda_function_framed_in<In: Archive, Out: Portable>(
     local: &mut Endpoint,
     remote: &mut Endpoint,
     handler: impl FnOnce(&In::Archived) -> Result<Out, CUerror>,
@@ -1493,7 +1438,7 @@ fn handle_cuda_function_framed_in<In: Archive, Out: Portable + for<'a, 'b> Seria
     }
     #[cfg(feature = "physx-diagnostics")]
     diagnostic.finish(remote.shared_memory.read_header());
-    reply_and_wait(local, remote);
+    unsafe { SignalObjectAndWait(*remote.event, *local.event, INFINITE, false) };
 }
 
 macro_rules! nop {
@@ -1503,19 +1448,9 @@ macro_rules! nop {
 macro_rules! implemented {
     ($($abi:literal fn $fn_name:ident( $($arg_id:ident : $arg_type:ty),* ) -> $ret_type:ty;)*) => {
         $(
-            #[cfg(windows)]
             #[link(name = "nvcuda", kind = "raw-dylib")]
             unsafe extern $abi {
                 fn $fn_name ( $( $arg_id : $arg_type),* ) -> $ret_type;
-            }
-            #[cfg(target_os = "linux")]
-            #[allow(non_snake_case)]
-            unsafe fn $fn_name($( $arg_id : $arg_type),*) -> $ret_type {
-                static SYMBOL: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
-                let address = SYMBOL.get_or_init(|| native_host::symbol(concat!(stringify!($fn_name), "\0").as_bytes()));
-                let Some(address) = *address else { return Err(CUerror::NOT_SUPPORTED); };
-                let function: unsafe extern "C" fn($( $arg_type),*) -> $ret_type = std::mem::transmute(address);
-                function($($arg_id),*)
             }
         )*
 

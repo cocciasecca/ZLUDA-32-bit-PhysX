@@ -17,8 +17,8 @@ def run(*args):
     return subprocess.check_output(args, text=True)
 
 
-def deploy(run_id, host='deck@192.168.10.67', key=None, profile='native-linux'):
-    if profile != 'native-linux':
+def deploy(run_id, host='deck@192.168.10.67', key=None, profile='texture-deferral'):
+    if profile != 'texture-deferral':
         raise RuntimeError('Profilo non valido')
     run_id = str(run_id)
     if not run_id.isdecimal() or not re.fullmatch(r'[A-Za-z0-9_.-]+@[A-Za-z0-9.-]+', host):
@@ -35,13 +35,15 @@ def deploy(run_id, host='deck@192.168.10.67', key=None, profile='native-linux'):
         root = Path(temp)
         payload = root/'payload'
         run('gh', 'run', 'download', run_id, '--repo', REPO, '-n', f'physx-servers-{sha}', '-D', str(payload))
-        if 'Configuration: native-linux-physx-v1' not in (payload/'README.txt').read_text(encoding='utf-8-sig'):
+        if 'Configuration: windows-borrowed-transfers-v1' not in (payload/'README.txt').read_text(encoding='utf-8-sig'):
             raise RuntimeError('Build precedente incompatibile: esegui la build della configurazione corrente.')
-        expected = {'32/native-dll-probe.exe', '32/nvcuda.dll', 'control/zluda64_server.exe', 'diagnostic/zluda64_server.exe'}
+        expected = {'32/nvcuda.dll', 'control/zluda64_server.exe', 'diagnostic/zluda64_server.exe'}
         seen = set()
         for row in (payload/'SHA256SUMS.txt').read_text(encoding='utf-8-sig').splitlines():
             digest, name = row.split(None, 1)
             name = name.replace('\\', '/')
+            if name == 'reuse/zluda64_server.exe':
+                continue  # Archived four-binary packages remain installable.
             if name not in expected or name in seen:
                 raise RuntimeError('Manifest inatteso')
             seen.add(name)
@@ -51,20 +53,10 @@ def deploy(run_id, host='deck@192.168.10.67', key=None, profile='native-linux'):
             machine = struct.unpack_from('<H', data, struct.unpack_from('<I', data, 60)[0]+4)[0]
             if machine != (0x14c if name.startswith('32/') else 0x8664):
                 raise RuntimeError(f'Architettura errata: {name}')
-            if name != '32/native-dll-probe.exe' and sha[:7].encode() not in data and sha[:7].encode('utf-16-le') not in data:
+            if sha[:7].encode() not in data and sha[:7].encode('utf-16-le') not in data:
                 raise RuntimeError(f'Revisione errata: {name}')
         if seen != expected:
             raise RuntimeError('Pacchetto incompleto')
-        run('gh', 'run', 'download', run_id, '--repo', REPO, '-n', f'physx-native-{sha}', '-D', str(payload/'native'))
-        native = json.loads((payload/'native/manifest.json').read_text())
-        if native['revision'] != sha or native['configuration'] != 'native-linux-physx-v1':
-            raise RuntimeError('Backend Linux e DLL non corrispondono')
-        expected_native = {'zluda64_server', 'libnvcuda.so', 'native_runtime.py', 'rollback_native.py'}
-        if set(native['files']) != expected_native:
-            raise RuntimeError('Pacchetto Linux incompleto')
-        for name, digest in native['files'].items():
-            if hashlib.sha256((payload/'native'/name).read_bytes()).hexdigest() != digest:
-                raise RuntimeError(f'Hash Linux errato: {name}')
         remote = run('ssh', *options, host, 'mktemp -d /home/deck/zluda-install-XXXXXXXX').strip()
         if not re.fullmatch(r'/home/deck/zluda-install-[A-Za-z0-9]+', remote):
             raise RuntimeError('Directory remota inattesa')

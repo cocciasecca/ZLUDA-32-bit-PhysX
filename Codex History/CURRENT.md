@@ -1,3 +1,27 @@
+# Current: Windows dispatcher + borrowed host-transfer serialization
+
+User requested reverting project development to the Windows path, leaving Legion
+unchanged until a later deployment. Native TCP gave ~10 FPS; shared RAM ~12 FPS.
+Windows previously gave ~26–30 FPS with texture deferral. These are user reports,
+not a controlled attribution of the Linux regression to one mechanism.
+
+Restored the Windows IPC/server path from bf0d871, retaining texture destruction
+and transfer deferral and range cache. Native implementation remains in c17a028
+and helper sources, but is not started by the active DLL or experimental workflow.
+Installer now restores the original Proton launcher when migrating from native.
+No remote installation, push or build was performed for this change.
+
+Next prototype: eliminate slice.to_vec() before serializing HtoD and HtoDAsync
+requests. Borrowed Cow slices archive as the exact existing wire structs; the
+server never receives a caller pointer. This removes one allocation and copy per
+host transfer, without changing waits or GPU semantics. Expected FPS benefit is
+unknown. CI tests compare wire bytes and decode after the caller buffer changes,
+including buffer growth; local Rust checks compile these tests for Windows.
+
+User runs push/build/install scripts. Do not poll GitHub. Legion stays unchanged.
+
+## Historical notes (superseded)
+
 # Current work: shared-RAM transport prototype
 
 Native build 40020496411 (6c66f57) passed DLL copies and a PTX32 GPU kernel on Legion.

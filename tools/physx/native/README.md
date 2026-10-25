@@ -1,3 +1,9 @@
+> Archived experiment: native TCP gave about 10 FPS and shared RAM about 12 FPS
+> in the user's scene. Active development and installation have returned to the
+> Windows dispatcher. This directory retains evidence/helpers; it is not the
+> current build/install procedure. See ../PUSH_BUILD.md. The complete native
+> implementation is preserved in commit c17a028.
+
 # Native Linux PhysX backend
 
 The current code routes the existing Windows 32-bit nvcuda.dll wire protocol to a

@@ -476,3 +476,56 @@ unsafe impl<'a> Allocator<AllocError> for ScopedArena<'a> {
 
 pub type Serializer<'a, 'local> =
     Strategy<rkyv::ser::Serializer<SliceWriter<'a>, ScopedArena<'local>, ()>, AllocError>;
+
+// Borrow bytes only until serialization finishes. The server receives the same
+// owned wire type and never retains the caller's pointer.
+#[derive(Archive, Serialize)]
+#[rkyv(as = ArchivedcuMemcpyHtoD_v2In)]
+#[rkyv(serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator))]
+pub struct MemcpyHtoDBorrowed<'a> {
+    pub dst_device: <CUdeviceptr_v2 as CudaEncode>::WireObject,
+    #[rkyv(with = rkyv::with::AsOwned, omit_bounds)]
+    pub src_host: std::borrow::Cow<'a, [u8]>,
+}
+
+#[derive(Archive, Serialize)]
+#[rkyv(as = ArchivedcuMemcpyHtoDAsync_v2In)]
+#[rkyv(serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator))]
+pub struct MemcpyHtoDAsyncBorrowed<'a> {
+    pub dst_device: <CUdeviceptr_v2 as CudaEncode>::WireObject,
+    #[rkyv(with = rkyv::with::AsOwned, omit_bounds)]
+    pub src_host: std::borrow::Cow<'a, [u8]>,
+    pub stream: <CUstream as CudaEncode>::WireObject,
+}
+
+#[cfg(test)]
+mod borrowed_transfer_tests {
+    use super::*;
+    #[test]
+    fn borrowed_transfers_match_existing_wire_and_own_serialized_bytes() {
+        let mut arena = stumpalo::Arena::new();
+        let mut owned_buffer = message_buffer::MessageBuffer::new();
+        let mut borrowed_buffer = message_buffer::MessageBuffer::new();
+        for size in [0, 1, 257, 1024 * 1024 + 137, 7] {
+            let mut bytes: Vec<u8> = (0..size).map(|i| (i % 251) as u8).collect();
+            let owned = cuMemcpyHtoD_v2In { dst_device: 256.into(), src_host: bytes.clone() };
+            let borrowed = MemcpyHtoDBorrowed { dst_device: 256.into(), src_host: std::borrow::Cow::Borrowed(&bytes) };
+            owned_buffer.serialize_body(&mut arena, &owned).unwrap();
+            borrowed_buffer.serialize_body(&mut arena, &borrowed).unwrap();
+            assert_eq!(owned_buffer.read_buffer(), borrowed_buffer.read_buffer());
+            drop(borrowed);
+            bytes.fill(255);
+            let decoded = borrowed_buffer.deserialize_body::<cuMemcpyHtoD_v2In>().unwrap();
+            assert_eq!(decoded, owned);
+
+            let owned = cuMemcpyHtoDAsync_v2In { dst_device: 512.into(), src_host: bytes.clone(), stream: 123.into() };
+            let borrowed = MemcpyHtoDAsyncBorrowed { dst_device: 512.into(), src_host: std::borrow::Cow::Borrowed(&bytes), stream: 123.into() };
+            owned_buffer.serialize_body(&mut arena, &owned).unwrap();
+            borrowed_buffer.serialize_body(&mut arena, &borrowed).unwrap();
+            assert_eq!(owned_buffer.read_buffer(), borrowed_buffer.read_buffer());
+            drop(borrowed);
+            bytes.fill(0);
+            assert_eq!(borrowed_buffer.deserialize_body::<cuMemcpyHtoDAsync_v2In>().unwrap(), owned);
+        }
+    }
+}

@@ -18,7 +18,7 @@ def module(name, path):
 
 
 HERE = Path(__file__).resolve().parent
-installer = module('native_installer_test', HERE.parent/'legion_install.py')
+installer = module('native_installer_test', HERE/'archived_legion_install.py')
 rollback = module('native_rollback_test', HERE/'rollback_native.py')
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 
