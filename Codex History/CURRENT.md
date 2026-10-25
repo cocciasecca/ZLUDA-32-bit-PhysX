@@ -1,3 +1,11 @@
+# Latest result: revert direct GPU-to-CPU readback
+
+User reports 29 FPS for 17d51b3 and 24 FPS for ae52d74. Reverted only the
+latter direct-readback experiment: client IPC, proxy, common code and workflow
+match 17d51b3 again. CPU-to-GPU borrowed serialization and texture deferral remain.
+This is a practical rollback after a reported regression, not proof of its cause.
+No push, build or Legion installation performed. User runs the normal script.
+
 # Current: Windows dispatcher + borrowed host-transfer serialization
 
 User requested reverting project development to the Windows path, leaving Legion
@@ -11,20 +19,12 @@ and helper sources, but is not started by the active DLL or experimental workflo
 Installer now restores the original Proton launcher when migrating from native.
 No remote installation, push or build was performed for this change.
 
-Transfer prototype: eliminate slice.to_vec() before serializing HtoD and HtoDAsync
+Next prototype: eliminate slice.to_vec() before serializing HtoD and HtoDAsync
 requests. Borrowed Cow slices archive as the exact existing wire structs; the
 server never receives a caller pointer. This removes one allocation and copy per
 host transfer, without changing waits or GPU semantics. Expected FPS benefit is
 unknown. CI tests compare wire bytes and decode after the caller buffer changes,
 including buffer growth; local Rust checks compile these tests for Windows.
-
-The reverse DtoHAsync path now copies directly from the archived IPC reply into
-the caller buffer under the GlobalState mutex, avoiding owned Vec deserialization.
-The common receive path retains status handling and mapping replacement. Length
-mismatches fail before writing; tests compare owned decoding, growth, reuse and
-caller-buffer independence. No waits or server GPU operations were changed.
-Repeated texture setters were inspected but are not skipped: unchanged native
-setters still execute, so preserving their error behavior needs further evidence.
 
 User runs push/build/install scripts. Do not poll GitHub. Legion stays unchanged.
 

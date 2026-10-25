@@ -16,8 +16,6 @@ Il percorso sperimentale compila DLL a 32 bit e server Windows con rinvio delle
 distruzioni texture e cache dei range attivi. Non compila LLVM/backend Linux.
 Il nuovo prototipo elimina il vettore temporaneo nei trasferimenti host→device,
 serializzando direttamente i byte del chiamante nel messaggio IPC originale.
-Anche il ritorno device→host copia direttamente dal messaggio IPC nel buffer del
-gioco, senza ricostruire un vettore temporaneo, sotto il mutex della connessione.
 Ordine, attese GPU e protocollo ricevuto dal server restano invariati.
 
 Il pacchetto corrente ha configurazione `windows-borrowed-transfers-v1`.
